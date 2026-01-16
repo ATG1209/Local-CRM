@@ -1,7 +1,7 @@
-# Basepoint CRM - Project Context & Guidelines
+# Local CRM - Project Context & Guidelines
 
 ## 1. Project Overview
-Basepoint CRM is a high-fidelity, React-based frontend replica of modern CRM interfaces (specifically inspired by Attio). It focuses on speed, keyboard accessibility, and a clean, data-dense UI.
+Local CRM is a high-fidelity, React-based frontend replica of modern CRM interfaces (specifically inspired by Attio). It focuses on speed, keyboard accessibility, and a clean, data-dense UI.
 
 > [!IMPORTANT]
 > **LOCAL DATA ONLY**: This project deals with highly sensitive data. It must be 100% local. No data should ever be sent to an external server. The database is a local SQLite file.
@@ -33,6 +33,17 @@ Basepoint CRM is a high-fidelity, React-based frontend replica of modern CRM int
 - **Animations**: Use `animate-in fade-in zoom-in-95` for snappy entry animations.
 - **Inputs**: Remove default outlines (`outline-none`) and use custom focus rings or borders.
 - **Tables**: specific column definitions found in View components (`CompaniesView`, `TasksView`).
+
+### Detail Panel Standards
+- **Width**: Standard width is `520px` for all detail panels.
+- **Header**: Compact header with icon, title, and quick attributes.
+- **Properties Section**:
+  - Uses `RelationPicker` for multi-select relations (e.g. "Point of Contact").
+  - **Visibility**: Hovering a property row shows:
+    - Settings icon (left of action group)
+    - Hide eye-off icon (right of action group)
+  - **Action Column**: Right-aligned, fixed width column for action icons.
+  - **Hidden Properties**: Collapsible section at the bottom for hidden fields.
 
 ## 4. Key Components
 

@@ -27,7 +27,7 @@ export interface Company {
   // New specific fields
   links: { label: string; url: string }[];
   specialOffers: string[]; // Multi-select
-  pointOfContactId: string | null; // Relation to Person
+  pointOfContactId: string[]; // Relation to People (supports multiple contacts)
   notes: string;
   nextTaskDate: string | null; // "Due date" from tasks
   externalId: string; // External CID
@@ -125,7 +125,8 @@ export type ColumnType =
   | 'email'
   | 'company'
   | 'person'
-  | 'url';
+  | 'url'
+  | 'link';
 
 export interface AttributeOption {
   id: string;
@@ -144,14 +145,58 @@ export interface ColumnDefinition {
   readonly?: boolean; // Cannot be edited directly
   options?: AttributeOption[]; // For select/multi-select
   description?: string;
+  config?: AttributeConfig; // Full config for link abbreviation, relation target, etc.
+}
+
+export interface SortRule {
+  key: string;
+  direction: 'asc' | 'desc';
+}
+
+export type SortConfig = SortRule[];
+
+export type FilterOperator =
+  | 'contains'
+  | 'not_contains'
+  | 'is'
+  | 'is_not'
+  | 'is_empty'
+  | 'is_not_empty'
+  | 'gt'
+  | 'gte'
+  | 'lt'
+  | 'lte'
+  | 'before'
+  | 'after'
+  | 'on'
+  | 'on_or_before'
+  | 'on_or_after';
+
+export interface FilterRule {
+  id: string;
+  columnId: string;
+  operator: FilterOperator;
+  value?: string | number | boolean | null;
+}
+
+export interface KanbanConfig {
+  groupByAttributeId: string;     // select/status attribute for columns
+  cardFields?: string[];          // attribute IDs to show on cards
+  showColumnCounts?: boolean;
+  showColumnSums?: string;        // attribute ID for sum (e.g., 'value')
 }
 
 export interface SavedView {
   id: string;
   name: string;
+  objectId: string;               // Link view to specific object/database
   type: 'table' | 'kanban';
   columns: ColumnDefinition[];
-  sort?: { key: string; direction: 'asc' | 'desc' };
+  sort?: SortRule[];
+  filters?: FilterRule[];
+  kanbanConfig?: KanbanConfig;    // Kanban-specific settings
+  isDefault?: boolean;            // Mark default view per object
+  isFavorite?: boolean;           // Show in sidebar favorites
 }
 
 // --- Flexible Schema Types ---
@@ -183,6 +228,7 @@ export interface AttributeConfig {
   cardinality?: 'one' | 'many';      // one-to-one vs one-to-many
   rollupAttributeId?: string;        // For rollups
   rollupFunction?: 'count' | 'first' | 'last' | 'sum' | 'avg' | 'min' | 'max';
+  abbreviation?: string;             // For link type - short display name (e.g., "GA")
 }
 
 export interface RecordRelation {

@@ -20,6 +20,8 @@ interface TasksViewProps {
    onDeleteTask: (id: string) => void;
    onOpenQuickTask: () => void;
    newTaskTrigger?: number;
+   initialViewId?: string;
+   onViewFavoriteChange?: () => void;
 }
 
 const AVAILABLE_COLUMNS: ColumnDefinition[] = [
@@ -31,14 +33,16 @@ const AVAILABLE_COLUMNS: ColumnDefinition[] = [
 ];
 
 const TasksView: React.FC<TasksViewProps> = ({
-   tasks = [],
-   companies = [],
-   people = [],
+   tasks,
+   companies,
+   people,
    onAddTask,
    onUpdateTask,
    onDeleteTask,
    onOpenQuickTask,
-   newTaskTrigger
+   newTaskTrigger,
+   initialViewId,
+   onViewFavoriteChange
 }) => {
 
    // State for date picker management
@@ -69,10 +73,13 @@ const TasksView: React.FC<TasksViewProps> = ({
          objectName="Task"
          data={tasks}
          people={people}
+         companies={companies}
          columns={AVAILABLE_COLUMNS} // Provide standard columns
          onAddRecord={() => onOpenQuickTask()}
          onUpdateRecord={onUpdateTask}
          onDeleteRecord={onDeleteTask}
+         initialViewId={initialViewId}
+         onViewFavoriteChange={onViewFavoriteChange}
 
          // Custom Cell Renderer for standard task interactions
          renderCustomCell={(record: any, col: ColumnDefinition) => {
@@ -130,14 +137,9 @@ const TasksView: React.FC<TasksViewProps> = ({
                      {openDatePickerId !== null && openDatePickerId === task.id && (
                         <DatePickerPopover
                            isOpen={true}
-                           date={task.dueDate ? new Date(task.dueDate) : null}
+                           date={task.dueDate || null}
                            onChange={(d) => {
-                              const iso = d ? d.toISOString() : null;
-                              onUpdateTask({ ...task, dueDate: iso });
-                              // Close picker after selection if standard date, or keep open if time? 
-                              // Let's keep existing behavior or close it. 
-                              // Usually standard is close unless time picking. 
-                              // But DatePickerPopover handles its own close often.
+                              onUpdateTask({ ...task, dueDate: d });
                            }}
                            onClose={() => setOpenDatePickerId(null)}
                            triggerRef={datePickerRef}
@@ -173,7 +175,7 @@ const TasksView: React.FC<TasksViewProps> = ({
             return null; // Fallback to default
          }}
 
-         DetailPanelRequest={({ isOpen, onClose, data, onUpdate }) => (
+         DetailPanelRequest={({ isOpen, onClose, data, onUpdate, columns, onEditAttribute, onAddProperty, onToggleVisibility }) => (
             <TaskDetailPanel
                task={data}
                isOpen={isOpen}
@@ -182,6 +184,10 @@ const TasksView: React.FC<TasksViewProps> = ({
                people={people || []}
                onUpdate={onUpdate}
                onDelete={onDeleteTask}
+               columns={columns}
+               onEditAttribute={onEditAttribute}
+               onAddProperty={onAddProperty}
+               onToggleVisibility={onToggleVisibility}
             />
          )}
       />

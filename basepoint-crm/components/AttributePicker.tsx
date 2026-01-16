@@ -19,7 +19,8 @@ import {
     Globe,
     Clock,
     Star,
-    CheckSquare
+    CheckSquare,
+    Zap
 } from 'lucide-react';
 import { ColumnType } from '../types';
 import { Attribute } from '../utils/schemaApi';
@@ -49,6 +50,7 @@ const TypeIcon = ({ type, size = 14 }: { type: string; size?: number }) => {
         case 'location': return <MapPin size={size} className="text-gray-500" />;
         case 'phone': return <Phone size={size} className="text-gray-500" />;
         case 'multi-select': return <Grid2X2 size={size} className="text-gray-500" />;
+        case 'link': return <Zap size={size} className="text-gray-500" />;
         default: return <Hash size={size} className="text-gray-500" />;
     }
 };

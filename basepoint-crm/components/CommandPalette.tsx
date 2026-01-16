@@ -31,6 +31,20 @@ const CommandPalette: React.FC<CommandPaletteProps> = ({
 
    const hasResults = filteredCompanies.length > 0 || filteredPeople.length > 0 || filteredTasks.length > 0;
 
+   type ResultItem =
+      | { kind: 'company'; entity: Company }
+      | { kind: 'person'; entity: Person }
+      | { kind: 'task'; entity: Task };
+
+   const resultItems: ResultItem[] = React.useMemo(() => {
+      if (!query) return [];
+      const items: ResultItem[] = [];
+      filteredCompanies.slice(0, 3).forEach(company => items.push({ kind: 'company', entity: company }));
+      filteredPeople.slice(0, 3).forEach(person => items.push({ kind: 'person', entity: person }));
+      filteredTasks.slice(0, 3).forEach(task => items.push({ kind: 'task', entity: task }));
+      return items;
+   }, [filteredCompanies, filteredPeople, filteredTasks, query]);
+
    useEffect(() => {
       if (isOpen) {
          setTimeout(() => inputRef.current?.focus(), 50);
@@ -39,9 +53,43 @@ const CommandPalette: React.FC<CommandPaletteProps> = ({
       }
    }, [isOpen]);
 
+   useEffect(() => {
+      setSelectedIndex(prev => {
+         if (resultItems.length === 0) return 0;
+         return Math.min(prev, resultItems.length - 1);
+      });
+   }, [resultItems.length]);
+
+   const handleSelect = (item: ResultItem | undefined) => {
+      if (!item) return;
+      if (item.kind === 'company') {
+         onNavigate('companies');
+      } else if (item.kind === 'person') {
+         onNavigate('people');
+      } else {
+         onNavigate('tasks');
+      }
+      onClose();
+   };
+
    const handleKeyDown = (e: React.KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-      // Simplified navigation logic for the demo
+      if (e.key === 'Escape') {
+         onClose();
+         return;
+      }
+      if (e.key === 'ArrowDown') {
+         e.preventDefault();
+         if (resultItems.length === 0) return;
+         setSelectedIndex(prev => Math.min(prev + 1, resultItems.length - 1));
+      } else if (e.key === 'ArrowUp') {
+         e.preventDefault();
+         if (resultItems.length === 0) return;
+         setSelectedIndex(prev => Math.max(prev - 1, 0));
+      } else if (e.key === 'Enter') {
+         e.preventDefault();
+         if (resultItems.length === 0) return;
+         handleSelect(resultItems[selectedIndex]);
+      }
    };
 
    if (!isOpen) return null;
@@ -82,7 +130,11 @@ const CommandPalette: React.FC<CommandPaletteProps> = ({
                   <div className="mb-2">
                      <div className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider px-3 py-1.5">Companies</div>
                      {filteredCompanies.slice(0, 3).map(company => (
-                        <div key={company.id} onClick={() => { onNavigate('companies'); onClose(); }} className="flex items-center justify-between px-3 py-2 hover:bg-gray-100 rounded-md cursor-pointer group">
+                        <div
+                           key={company.id}
+                           onClick={() => handleSelect({ kind: 'company', entity: company })}
+                           className={`flex items-center justify-between px-3 py-2 rounded-md cursor-pointer group ${resultItems[selectedIndex] && resultItems[selectedIndex].kind === 'company' && resultItems[selectedIndex].entity.id === company.id ? 'bg-blue-50' : 'hover:bg-gray-100'}`}
+                        >
                            <div className="flex items-center gap-3">
                               <img src={company.logo} className="w-5 h-5 rounded-sm" alt="" />
                               <span className="text-sm font-medium text-gray-800">{company.name}</span>
@@ -97,7 +149,11 @@ const CommandPalette: React.FC<CommandPaletteProps> = ({
                   <div className="mb-2">
                      <div className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider px-3 py-1.5">People</div>
                      {filteredPeople.slice(0, 3).map(person => (
-                        <div key={person.id} onClick={() => { onNavigate('people'); onClose(); }} className="flex items-center justify-between px-3 py-2 hover:bg-gray-100 rounded-md cursor-pointer group">
+                        <div
+                           key={person.id}
+                           onClick={() => handleSelect({ kind: 'person', entity: person })}
+                           className={`flex items-center justify-between px-3 py-2 rounded-md cursor-pointer group ${resultItems[selectedIndex] && resultItems[selectedIndex].kind === 'person' && resultItems[selectedIndex].entity.id === person.id ? 'bg-blue-50' : 'hover:bg-gray-100'}`}
+                        >
                            <div className="flex items-center gap-3">
                               <img src={person.avatar} className="w-5 h-5 rounded-full" alt="" />
                               <span className="text-sm font-medium text-gray-800">{person.name}</span>
@@ -113,7 +169,11 @@ const CommandPalette: React.FC<CommandPaletteProps> = ({
                   <div className="mb-2">
                      <div className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider px-3 py-1.5">Tasks</div>
                      {filteredTasks.slice(0, 3).map(task => (
-                        <div key={task.id} onClick={() => { onNavigate('tasks'); onClose(); }} className="flex items-center justify-between px-3 py-2 hover:bg-gray-100 rounded-md cursor-pointer group">
+                        <div
+                           key={task.id}
+                           onClick={() => handleSelect({ kind: 'task', entity: task })}
+                           className={`flex items-center justify-between px-3 py-2 rounded-md cursor-pointer group ${resultItems[selectedIndex] && resultItems[selectedIndex].kind === 'task' && resultItems[selectedIndex].entity.id === task.id ? 'bg-blue-50' : 'hover:bg-gray-100'}`}
+                        >
                            <div className="flex items-center gap-3">
                               <div className={`w-4 h-4 rounded-full border border-gray-300 ${task.isCompleted ? 'bg-green-500 border-green-500' : 'bg-white'}`}></div>
                               <span className="text-sm font-medium text-gray-800 line-clamp-1">{task.title}</span>

@@ -48,8 +48,9 @@ export const attributeToColumn = (attr: Attribute): ColumnDefinition => {
         readonly: attr.isSystem && attr.name === 'Creation date', // Only some system fields are readonly
         options: attr.config?.options || undefined,
         description: '',
-        width: getDefaultWidth(attr.type),
-    };
+        width: attr.config?.width || getDefaultWidth(attr.type),
+        config: attr.config, // Preserve full config for link abbreviation etc.
+    } as ColumnDefinition;
 };
 
 const getDefaultWidth = (type: string): number => {
@@ -66,4 +67,21 @@ const getDefaultWidth = (type: string): number => {
         case 'relation': return 200;
         default: return 180;
     }
+};
+
+/**
+ * Helper to pluralize CRM object names
+ */
+export const pluralize = (name: string): string => {
+    if (!name) return '';
+    const lower = name.toLowerCase();
+    if (lower === 'company') return 'Companies';
+    if (lower === 'person') return 'People';
+    if (lower === 'task') return 'Tasks';
+    if (lower === 'deal') return 'Deals';
+
+    // Default fallback
+    if (lower.endsWith('y')) return name.slice(0, -1) + 'ies';
+    if (lower.endsWith('s')) return name;
+    return name + 's';
 };

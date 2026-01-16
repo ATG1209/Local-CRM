@@ -9,6 +9,8 @@ interface PeopleViewProps {
    onAddPerson: (person: Person) => void;
    onUpdatePerson: (person: Person) => void;
    onDeletePerson: (id: string) => void;
+   initialViewId?: string;
+   onViewFavoriteChange?: () => void;
 }
 
 const PeopleView: React.FC<PeopleViewProps> = ({
@@ -16,7 +18,9 @@ const PeopleView: React.FC<PeopleViewProps> = ({
    companies,
    onAddPerson,
    onUpdatePerson,
-   onDeletePerson
+   onDeletePerson,
+   initialViewId,
+   onViewFavoriteChange
 }) => {
    return (
       <GenericObjectView
@@ -24,10 +28,13 @@ const PeopleView: React.FC<PeopleViewProps> = ({
          objectName="Person"
          data={people}
          people={people}
+         companies={companies}
          onAddRecord={onAddPerson}
          onUpdateRecord={onUpdatePerson}
          onDeleteRecord={onDeletePerson}
-         DetailPanelRequest={({ isOpen, onClose, data, onUpdate, columns, people, onEditAttribute, onAddProperty }) => (
+         initialViewId={initialViewId}
+         onViewFavoriteChange={onViewFavoriteChange}
+         DetailPanelRequest={({ isOpen, onClose, data, onUpdate, columns, people, onEditAttribute, onAddProperty, onToggleVisibility }) => (
             <PersonDetailPanel
                isOpen={isOpen}
                onClose={onClose}
@@ -38,6 +45,7 @@ const PeopleView: React.FC<PeopleViewProps> = ({
                columns={columns}
                onEditAttribute={onEditAttribute}
                onAddProperty={onAddProperty}
+               onToggleVisibility={onToggleVisibility}
             />
          )}
       />

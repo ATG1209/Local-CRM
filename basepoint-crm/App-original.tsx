@@ -1,21 +1,19 @@
-import React, { Suspense, useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import Sidebar from './components/Sidebar';
 import CompaniesView from './components/CompaniesView';
-const DealsView = React.lazy(() => import('./components/DealsView'));
-const ReportsView = React.lazy(() => import('./components/ReportsView'));
-const WorkflowsView = React.lazy(() => import('./components/WorkflowsView'));
+import DealsView from './components/DealsView';
+import ReportsView from './components/ReportsView';
+import WorkflowsView from './components/WorkflowsView';
 import TasksView from './components/TasksView';
 import PeopleView from './components/PeopleView';
-const PlaceholderView = React.lazy(() => import('./components/PlaceholderView'));
+import PlaceholderView from './components/PlaceholderView';
 import GenericObjectView from './components/GenericObjectView';
 import TopBar from './components/TopBar';
 import CommandPalette from './components/CommandPalette';
 import QuickTaskModal from './components/QuickTaskModal';
-import { ViewState, Company, Task, Person, SavedView } from './types';
+import { ViewState, Company, Task, Person } from './types';
 import { api } from './utils/api';
 import { fetchObjects, ObjectType } from './utils/schemaApi';
-import { getAllFavoriteViews } from './utils/viewsStorage';
-import ErrorBoundary from './ErrorBoundary';
 
 const App: React.FC = () => {
   const [activeView, setActiveView] = useState<ViewState>('companies');
@@ -32,22 +30,6 @@ const App: React.FC = () => {
   // Custom Objects State
   const [customObjects, setCustomObjects] = useState<ObjectType[]>([]);
 
-  // Favorites State
-  const [favoriteViews, setFavoriteViews] = useState<SavedView[]>([]);
-  const [selectedViewId, setSelectedViewId] = useState<string | undefined>(undefined);
-
-  const normalizeTaskDates = (task: Task): Task => ({
-    ...task,
-    dueDate: task.dueDate ? new Date(task.dueDate) : null,
-    createdAt: task.createdAt ? new Date(task.createdAt) : new Date()
-  });
-
-  const serializeTaskForApi = (task: Task) => ({
-    ...task,
-    dueDate: task.dueDate ? task.dueDate.toISOString() : null,
-    createdAt: task.createdAt ? task.createdAt.toISOString() : new Date().toISOString()
-  });
-
   useEffect(() => {
     const fetchData = async () => {
       console.log("App: Fetching initial data...");
@@ -57,6 +39,9 @@ const App: React.FC = () => {
           api.get('/tasks'),
           api.get('/people')
         ]);
+
+        // Also fetch custom objects
+        loadObjects();
 
         console.log("App: Raw data received", { fetchedCompanies, fetchedTasks, fetchedPeople });
 
@@ -73,7 +58,11 @@ const App: React.FC = () => {
         }
 
         try {
-          const parsedTasks = tasksArray.map((t: any) => normalizeTaskDates(t));
+          const parsedTasks = tasksArray.map((t: any) => ({
+            ...t,
+            dueDate: t.dueDate ? new Date(t.dueDate) : null,
+            createdAt: t.createdAt ? new Date(t.createdAt) : new Date()
+          }));
           setTasks(parsedTasks);
         } catch (parseErr) {
           console.error("App: Error parsing tasks", parseErr);
@@ -92,9 +81,6 @@ const App: React.FC = () => {
       }
     };
     fetchData();
-
-    // Load objects separately
-    loadObjects();
   }, []);
 
   const loadObjects = async () => {
@@ -106,44 +92,15 @@ const App: React.FC = () => {
     }
   };
 
-  // Load favorite views
-  const loadFavorites = useCallback(() => {
-    const favorites = getAllFavoriteViews();
-    setFavoriteViews(favorites);
-  }, []);
-
-  // Load favorites on mount
-  useEffect(() => {
-    loadFavorites();
-  }, [loadFavorites]);
-
-  // Handle favorite view click from sidebar
-  const handleFavoriteViewClick = useCallback((view: SavedView) => {
-    // Map objectId to ViewState
-    const viewStateMap: Record<string, ViewState> = {
-      'obj_companies': 'companies',
-      'obj_people': 'people',
-      'obj_tasks': 'tasks'
-    };
-
-    const targetViewState = viewStateMap[view.objectId] || view.objectId as ViewState;
-    setSelectedViewId(view.id);
-    setActiveView(targetViewState);
-  }, []);
-
-  // Reset selectedViewId when activeView changes manually (not via favorite click)
-  const handleViewChange = useCallback((view: ViewState) => {
-    setSelectedViewId(undefined);
-    setActiveView(view);
-  }, []);
-
   // --- Database Actions ---
   const handleAddCompany = async (company: Company) => {
+    // Optimistic update
     setCompanies(prev => [company, ...prev]);
     try {
       await api.post('/companies', company);
     } catch (err) {
       console.error("Failed to add company", err);
+      // Revert if needed, implementation omitted for brevity
     }
   };
 
@@ -162,18 +119,16 @@ const App: React.FC = () => {
   };
 
   const handleAddTask = async (task: Task) => {
-    const normalized = normalizeTaskDates(task);
-    setTasks(prev => [normalized, ...prev]);
+    setTasks(prev => [task, ...prev]);
     try {
-      await api.post('/tasks', serializeTaskForApi(normalized));
+      await api.post('/tasks', task);
     } catch (err) { console.error(err); }
   };
 
   const handleUpdateTask = async (updatedTask: Task) => {
-    const normalized = normalizeTaskDates(updatedTask);
-    setTasks(prev => prev.map(t => t.id === normalized.id ? normalized : t));
+    setTasks(prev => prev.map(t => t.id === updatedTask.id ? updatedTask : t));
     try {
-      await api.put(`/tasks/${normalized.id}`, serializeTaskForApi(normalized));
+      await api.put(`/tasks/${updatedTask.id}`, updatedTask);
     } catch (err) { console.error(err); }
   };
 
@@ -205,14 +160,17 @@ const App: React.FC = () => {
     } catch (err) { console.error(err); }
   };
 
+
   // --- Keyboard Shortcuts ---
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Command K
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
         e.preventDefault();
         setIsCommandPaletteOpen(prev => !prev);
       }
 
+      // 'Q' for Quick Task (Global)
       if (e.key.toLowerCase() === 'q' && !isCommandPaletteOpen && !isQuickTaskModalOpen) {
         const target = e.target as HTMLElement;
         const isInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable;
@@ -222,10 +180,13 @@ const App: React.FC = () => {
         }
       }
 
+      // 'Escape' to close global modals
       if (e.key === 'Escape') {
         if (isCommandPaletteOpen) {
           setIsCommandPaletteOpen(false);
           e.preventDefault();
+        } else if (isQuickTaskModalOpen) {
+          // QuickTaskModal handles its own internal Escape logic
         }
       }
     };
@@ -234,111 +195,80 @@ const App: React.FC = () => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isCommandPaletteOpen, isQuickTaskModalOpen]);
 
+  // Determine if active view is a custom object
   const customObject = customObjects.find(o => o.id === activeView);
 
   const renderContent = () => {
     if (customObject) {
       return (
-        <ErrorBoundary>
-          <GenericObjectView
-            key={customObject.id}
-            objectId={customObject.id}
-            slug={customObject.slug}
-            objectName={customObject.name}
-          />
-        </ErrorBoundary>
+        <GenericObjectView
+          key={customObject.id}
+          objectId={customObject.id}
+          slug={customObject.slug}
+          objectName={customObject.name}
+        />
       );
     }
 
     switch (activeView) {
       case 'companies':
         return (
-          <ErrorBoundary>
-            <CompaniesView
-              companies={companies}
-              tasks={tasks}
-              people={people}
-              onAddCompany={handleAddCompany}
-              onUpdateCompany={handleUpdateCompany}
-              onDeleteCompany={handleDeleteCompany}
-              initialViewId={selectedViewId}
-              onViewFavoriteChange={loadFavorites}
-            />
-          </ErrorBoundary>
+          <CompaniesView
+            companies={companies}
+            tasks={tasks}
+            people={people}
+            onAddCompany={handleAddCompany}
+            onUpdateCompany={handleUpdateCompany}
+            onDeleteCompany={handleDeleteCompany}
+          />
         );
       case 'deals':
-        return (
-          <ErrorBoundary>
-            <DealsView />
-          </ErrorBoundary>
-        );
+        return <DealsView />;
       case 'reports':
-        return (
-          <ErrorBoundary>
-            <ReportsView />
-          </ErrorBoundary>
-        );
+        return <ReportsView />;
       case 'workflows':
-        return (
-          <ErrorBoundary>
-            <WorkflowsView />
-          </ErrorBoundary>
-        );
+        return <WorkflowsView />;
       case 'tasks':
         return (
-          <ErrorBoundary>
-            <TasksView
-              tasks={tasks}
-              companies={companies}
-              people={people}
-              onAddTask={handleAddTask}
-              onUpdateTask={handleUpdateTask}
-              onDeleteTask={handleDeleteTask}
-              onOpenQuickTask={() => setIsQuickTaskModalOpen(true)}
-              newTaskTrigger={newTaskTrigger}
-              initialViewId={selectedViewId}
-              onViewFavoriteChange={loadFavorites}
-            />
-          </ErrorBoundary>
+          <TasksView
+            tasks={tasks}
+            companies={companies}
+            people={people}
+            onAddTask={handleAddTask}
+            onUpdateTask={handleUpdateTask}
+            onDeleteTask={handleDeleteTask}
+            onOpenQuickTask={() => setIsQuickTaskModalOpen(true)}
+            newTaskTrigger={newTaskTrigger}
+          />
         );
       case 'people':
         return (
-          <ErrorBoundary>
-            <PeopleView
-              people={people}
-              companies={companies}
-              onAddPerson={handleAddPerson}
-              onUpdatePerson={handleUpdatePerson}
-              onDeletePerson={handleDeletePerson}
-              initialViewId={selectedViewId}
-              onViewFavoriteChange={loadFavorites}
-            />
-          </ErrorBoundary>
+          <PeopleView
+            people={people}
+            companies={companies}
+            onAddPerson={handleAddPerson}
+            onUpdatePerson={handleUpdatePerson}
+            onDeletePerson={handleDeletePerson}
+          />
         );
       case 'notifications':
       case 'emails':
       case 'sequences':
       case 'workspaces':
       case 'partnerships':
-        return (
-          <ErrorBoundary>
-            <PlaceholderView title={activeView.charAt(0).toUpperCase() + activeView.slice(1)} />
-          </ErrorBoundary>
-        );
+        return <PlaceholderView title={activeView.charAt(0).toUpperCase() + activeView.slice(1)} />;
       default:
+        // Default to companies if no match? Or Placeholder?
+        // Let's default to Companies as before
         return (
-          <ErrorBoundary>
-            <CompaniesView
-              companies={companies}
-              tasks={tasks}
-              people={people}
-              onAddCompany={handleAddCompany}
-              onUpdateCompany={handleUpdateCompany}
-              onDeleteCompany={handleDeleteCompany}
-              initialViewId={selectedViewId}
-              onViewFavoriteChange={loadFavorites}
-            />
-          </ErrorBoundary>
+          <CompaniesView
+            companies={companies}
+            tasks={tasks}
+            people={people}
+            onAddCompany={handleAddCompany}
+            onUpdateCompany={handleUpdateCompany}
+            onDeleteCompany={handleDeleteCompany}
+          />
         );
     }
   };
@@ -347,45 +277,42 @@ const App: React.FC = () => {
     <div className="flex h-screen w-full bg-white text-gray-900 font-sans overflow-hidden">
       <Sidebar
         activeView={activeView}
-        onChangeView={handleViewChange}
+        onChangeView={setActiveView}
         isCollapsed={isSidebarCollapsed}
         onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
         onOpenCommandPalette={() => setIsCommandPaletteOpen(true)}
         customObjects={customObjects}
         onObjectCreated={loadObjects}
-        favoriteViews={favoriteViews}
-        onFavoriteViewClick={handleFavoriteViewClick}
       />
 
       <div className="flex-1 flex flex-col min-w-0 transition-all duration-300">
         {!customObject && activeView !== 'workflows' && activeView !== 'reports' && activeView !== 'deals' && activeView !== 'companies' && activeView !== 'tasks' && activeView !== 'people' && (
           <TopBar activeView={activeView} />
         )}
+        {/* Hide TopBar for Custom Objects since GenericObjectView has its own header? 
+            GenericObjectView HAS a header. So hide TopBar if customObject is true. 
+            Or verify TopBar design. TopBar usually shows breadcrumbs.
+            GenericObjectView has "All Projects" header.
+        */}
 
-        <Suspense fallback={<div className="flex-1 flex items-center justify-center text-gray-400">Loading view…</div>}>
-          {renderContent()}
-        </Suspense>
+        {renderContent()}
       </div>
 
-      <ErrorBoundary>
-        <CommandPalette
-          isOpen={isCommandPaletteOpen}
-          onClose={() => setIsCommandPaletteOpen(false)}
-          onNavigate={(view) => { setActiveView(view); setIsCommandPaletteOpen(false); }}
-          companies={companies}
-          tasks={tasks}
-          people={people}
-        />
-      </ErrorBoundary>
+      <CommandPalette
+        isOpen={isCommandPaletteOpen}
+        onClose={() => setIsCommandPaletteOpen(false)}
+        onNavigate={(view) => { setActiveView(view); setIsCommandPaletteOpen(false); }}
+        companies={companies}
+        tasks={tasks}
+        people={people}
+      />
 
-      <ErrorBoundary>
-        <QuickTaskModal
-          isOpen={isQuickTaskModalOpen}
-          onClose={() => setIsQuickTaskModalOpen(false)}
-          onAddTask={handleAddTask}
-          companies={companies}
-        />
-      </ErrorBoundary>
+      <QuickTaskModal
+        isOpen={isQuickTaskModalOpen}
+        onClose={() => setIsQuickTaskModalOpen(false)}
+        onAddTask={handleAddTask}
+        companies={companies}
+      />
     </div>
   );
 };

@@ -34,7 +34,7 @@ const MOCK_COMPANIES = [
     domain: 'vercel.com',
     links: JSON.stringify([{ label: 'LinkedIn', url: '#' }, { label: 'Crunchbase', url: '#' }]),
     specialOffers: JSON.stringify(['Demand Gen', 'AI Max']),
-    pointOfContactId: 'p1',
+    pointOfContactId: JSON.stringify(['p1', 'p6']),
     notes: 'Key strategic partner for Q3.',
     nextTaskDate: futureDate(5),
     externalId: 'CID-9928',
@@ -52,7 +52,7 @@ const MOCK_COMPANIES = [
     domain: 'digitalocean.com',
     links: JSON.stringify([{ label: 'Website', url: '#' }]),
     specialOffers: JSON.stringify(['Launch P MAX']),
-    pointOfContactId: null,
+    pointOfContactId: JSON.stringify([]),
     notes: 'Discussing infrastructure overhaul.',
     nextTaskDate: futureDate(1),
     externalId: 'CID-1120',
@@ -70,7 +70,7 @@ const MOCK_COMPANIES = [
     domain: 'github.com',
     links: JSON.stringify([{ label: 'GitHub', url: '#' }]),
     specialOffers: JSON.stringify(['NCA', 'ECL']),
-    pointOfContactId: 'p2',
+    pointOfContactId: JSON.stringify(['p2']),
     notes: '',
     nextTaskDate: null,
     externalId: 'CID-3321',
@@ -88,7 +88,7 @@ const MOCK_COMPANIES = [
     domain: 'stripe.com',
     links: JSON.stringify([]),
     specialOffers: JSON.stringify(['VBB', 'Smart Bid']),
-    pointOfContactId: 'p3',
+    pointOfContactId: JSON.stringify(['p3']),
     notes: 'Waiting on legal review.',
     nextTaskDate: futureDate(30),
     externalId: 'CID-5543',
@@ -106,7 +106,7 @@ const MOCK_COMPANIES = [
     domain: 'figma.com',
     links: JSON.stringify([{ label: 'Design System', url: '#' }]),
     specialOffers: JSON.stringify(['Gateway']),
-    pointOfContactId: 'p4',
+    pointOfContactId: JSON.stringify(['p4']),
     notes: 'Renewal discussion pending.',
     nextTaskDate: futureDate(0),
     externalId: 'CID-8877',
@@ -457,8 +457,75 @@ function initDb() {
             { id: 'attr_comp_name', object_id: 'obj_companies', name: 'Company Name', type: 'text', is_system: 1, position: 0 },
             { id: 'attr_comp_domain', object_id: 'obj_companies', name: 'Domain', type: 'url', is_system: 1, position: 1 },
             { id: 'attr_comp_poc', object_id: 'obj_companies', name: 'Point of Contact', type: 'relation', is_system: 1, position: 2, config: JSON.stringify({ targetObjectId: 'obj_people', cardinality: 'many' }) },
-            { id: 'attr_comp_stage', object_id: 'obj_companies', name: 'Logging Stage', type: 'multi-select', is_system: 1, position: 3 },
+            {
+              id: 'attr_comp_stage',
+              object_id: 'obj_companies',
+              name: 'Logging Stage',
+              type: 'multi-select',
+              is_system: 1,
+              position: 3,
+              config: JSON.stringify({
+                options: [
+                  { id: 'call_logged', label: 'Call Logged', color: 'bg-indigo-100 text-indigo-700' },
+                  { id: 'email_logged', label: 'Email Logged', color: 'bg-blue-100 text-blue-700' },
+                  { id: 'call_scheduled', label: 'Call scheduled', color: 'bg-emerald-100 text-emerald-700' },
+                  { id: 'in_progress', label: 'In progress', color: 'bg-yellow-100 text-yellow-700' },
+                  { id: 'standby', label: 'Standby', color: 'bg-orange-100 text-orange-700' }
+                ]
+              })
+            },
             { id: 'attr_comp_next_task', object_id: 'obj_companies', name: 'Next Task', type: 'date', is_system: 1, position: 4 },
+            {
+              id: 'attr_comp_offers',
+              object_id: 'obj_companies',
+              name: 'Special Offers',
+              type: 'multi-select',
+              is_system: 1,
+              position: 5,
+              config: JSON.stringify({
+                options: [
+                  { id: 'demand_gen', label: 'Demand Gen', color: 'bg-pink-100 text-pink-700' },
+                  { id: 'ai_max', label: 'AI Max', color: 'bg-purple-100 text-purple-700' },
+                  { id: 'launch_p_max', label: 'Launch P MAX', color: 'bg-amber-100 text-amber-700' },
+                  { id: 'vbb', label: 'VBB', color: 'bg-violet-100 text-violet-700' },
+                  { id: 'smart_bid', label: 'Smart Bid', color: 'bg-emerald-100 text-emerald-700' },
+                  { id: 'gateway', label: 'Gateway', color: 'bg-slate-100 text-slate-700' }
+                ]
+              })
+            },
+            {
+              id: 'attr_comp_ground',
+              object_id: 'obj_companies',
+              name: 'Ground Control',
+              type: 'multi-select',
+              is_system: 1,
+              position: 6,
+              config: JSON.stringify({
+                options: [
+                  { id: 'to_keep', label: 'To Keep', color: 'bg-green-100 text-green-700' },
+                  { id: 'to_remove', label: 'To Remove', color: 'bg-red-100 text-red-700' },
+                  { id: 'rollover', label: 'Rollover', color: 'bg-blue-100 text-blue-700' }
+                ]
+              })
+            },
+            {
+              id: 'attr_comp_quarter',
+              object_id: 'obj_companies',
+              name: 'Quarter',
+              type: 'select',
+              is_system: 1,
+              position: 7,
+              config: JSON.stringify({
+                options: [
+                  { id: 'q1_2025', label: 'Q1 2025', color: 'bg-gray-100 text-gray-700' },
+                  { id: 'q2_2025', label: 'Q2 2025', color: 'bg-gray-100 text-gray-700' },
+                  { id: 'q3_2025', label: 'Q3 2025', color: 'bg-gray-100 text-gray-700' },
+                  { id: 'q4_2025', label: 'Q4 2025', color: 'bg-gray-100 text-gray-700' },
+                  { id: 'q1_2026', label: 'Q1 2026', color: 'bg-gray-100 text-gray-700' }
+                ]
+              })
+            },
+            { id: 'attr_comp_ext_id', object_id: 'obj_companies', name: 'External ID', type: 'text', is_system: 1, position: 8 },
           ];
           // Seed core attributes for People
           const peopleAttrs = [
@@ -466,6 +533,8 @@ function initDb() {
             { id: 'attr_ppl_email', object_id: 'obj_people', name: 'Email', type: 'email', is_system: 1, position: 1 },
             { id: 'attr_ppl_company', object_id: 'obj_people', name: 'Company', type: 'relation', is_system: 1, position: 2, config: JSON.stringify({ targetObjectId: 'obj_companies', cardinality: 'many' }) },
             { id: 'attr_ppl_role', object_id: 'obj_people', name: 'Role', type: 'text', is_system: 1, position: 3 },
+            { id: 'attr_ppl_phone', object_id: 'obj_people', name: 'Phone', type: 'phone', is_system: 1, position: 4 },
+            { id: 'attr_ppl_location', object_id: 'obj_people', name: 'Location', type: 'location', is_system: 1, position: 5 },
           ];
           // Seed core attributes for Tasks
           const taskAttrs = [

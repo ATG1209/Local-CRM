@@ -1,7 +1,7 @@
 {
-    "name": "basepoint-crm-server",
+    "name": "local-crm-server",
     "version": "1.0.0",
-    "description": "Local backend for Basepoint CRM",
+    "description": "Local backend for Local CRM",
     "main": "index.js",
     "scripts": {
         "start": "node index.js",

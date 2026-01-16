@@ -16,6 +16,7 @@ import {
     User,
     Briefcase,
     Link as LinkIcon,
+    Zap,
     Grid2X2
 } from 'lucide-react';
 
@@ -31,6 +32,8 @@ const TypeIcon: React.FC<TypeIconProps> = ({ type, size = 12, className = "text-
     switch (type) {
         case 'text':
             return <Type {...iconProps} />;
+        case 'link':
+            return <Zap {...iconProps} />;
         case 'url':
             return <LinkIcon {...iconProps} />;
         case 'relation':

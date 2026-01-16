@@ -10,6 +10,8 @@ interface CompaniesViewProps {
    onAddCompany: (company: Company) => void;
    onUpdateCompany: (company: Company) => void;
    onDeleteCompany: (id: string) => void;
+   initialViewId?: string;
+   onViewFavoriteChange?: () => void;
 }
 
 const CompaniesView: React.FC<CompaniesViewProps> = ({
@@ -18,7 +20,9 @@ const CompaniesView: React.FC<CompaniesViewProps> = ({
    people,
    onAddCompany,
    onUpdateCompany,
-   onDeleteCompany
+   onDeleteCompany,
+   initialViewId,
+   onViewFavoriteChange
 }) => {
    return (
       <GenericObjectView
@@ -29,7 +33,9 @@ const CompaniesView: React.FC<CompaniesViewProps> = ({
          onAddRecord={onAddCompany}
          onUpdateRecord={onUpdateCompany}
          onDeleteRecord={onDeleteCompany}
-         DetailPanelRequest={({ isOpen, onClose, data, onUpdate, columns, people, onEditAttribute, onAddProperty }) => (
+         initialViewId={initialViewId}
+         onViewFavoriteChange={onViewFavoriteChange}
+         DetailPanelRequest={({ isOpen, onClose, data, onUpdate, columns, people, onEditAttribute, onAddProperty, onToggleVisibility }) => (
             <CompanyDetailPanel
                isOpen={isOpen}
                onClose={onClose}
@@ -39,6 +45,7 @@ const CompaniesView: React.FC<CompaniesViewProps> = ({
                columns={columns}
                onEditAttribute={onEditAttribute}
                onAddProperty={onAddProperty}
+               onToggleVisibility={onToggleVisibility}
             />
          )}
       />

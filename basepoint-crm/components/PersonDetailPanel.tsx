@@ -27,8 +27,13 @@ import {
    User,
    Mail,
    Linkedin,
-   Briefcase
+   Briefcase,
+   Eye,
+   EyeOff,
+   ChevronDown,
+   ChevronRight
 } from 'lucide-react';
+import RelationPicker from './RelationPicker';
 
 interface PersonDetailPanelProps {
    person: Person | null;
@@ -41,6 +46,7 @@ interface PersonDetailPanelProps {
    columns: ColumnDefinition[];
    onEditAttribute: (col: ColumnDefinition) => void;
    onAddProperty: () => void;
+   onToggleVisibility?: (colId: string) => void;
 }
 
 const TypeIcon = ({ type }: { type: ColumnType }) => {
@@ -71,11 +77,13 @@ const PersonDetailPanel: React.FC<PersonDetailPanelProps> = ({
    onUpdate,
    columns,
    onEditAttribute,
-   onAddProperty
+   onAddProperty,
+   onToggleVisibility
 }) => {
    const [editForm, setEditForm] = useState<Person | null>(null);
    const panelRef = useRef<HTMLDivElement>(null);
    const [editingHeader, setEditingHeader] = useState(false);
+   const [showHiddenProps, setShowHiddenProps] = useState(false);
 
    useEffect(() => {
       if (person) {
@@ -144,11 +152,12 @@ const PersonDetailPanel: React.FC<PersonDetailPanelProps> = ({
       if (col.accessorKey === 'companyId') {
          return (
             <div className="h-8">
-               <SearchableSelect
+               <RelationPicker
                   value={value}
-                  onChange={(val) => handleUpdateField(col.accessorKey, val)}
+                  onChange={(newIds) => handleUpdateField(col.accessorKey, newIds[0] || null)} // Legacy single select
                   options={companyOptions}
-                  className="border-transparent bg-transparent hover:bg-gray-50 -ml-2"
+                  type="company"
+                  placeholder="Select company..."
                />
             </div>
          );
@@ -156,7 +165,6 @@ const PersonDetailPanel: React.FC<PersonDetailPanelProps> = ({
 
       switch (col.type) {
          case 'select':
-         case 'multi-select':
             if (col.options && col.options.length > 0) {
                return (
                   <div className="h-8">
@@ -189,7 +197,13 @@ const PersonDetailPanel: React.FC<PersonDetailPanelProps> = ({
                <input
                   type="date"
                   className={inputClass}
-                  value={value ? new Date(value).toISOString().split('T')[0] : ''}
+                  value={(() => {
+                     if (!value) return '';
+                     try {
+                        const d = new Date(value);
+                        return !isNaN(d.getTime()) ? d.toISOString().split('T')[0] : '';
+                     } catch { return ''; }
+                  })()}
                   onChange={(e) => handleUpdateField(col.accessorKey, e.target.value)}
                />
             );
@@ -241,136 +255,205 @@ const PersonDetailPanel: React.FC<PersonDetailPanelProps> = ({
    // Filter out columns we show in the header explicitly
    const detailColumns = columns.filter(c => c.id !== 'name' && c.id !== 'role' && c.visible);
 
+   // Calculate hidden columns
+   const hiddenColumns = columns.filter(c => c.id !== 'name' && c.id !== 'role' && !c.visible);
+
    return (
-      <div className={`fixed inset-y-0 right-0 w-[450px] bg-white shadow-2xl border-l border-gray-200 transform transition-transform duration-300 ease-in-out z-[60] flex flex-col ${isOpen ? 'translate-x-0' : 'translate-x-full'}`} ref={panelRef}>
-         {/* Compact Header */}
-         <div className="flex items-start justify-between px-5 py-4 border-b border-gray-100 bg-gray-50/30">
-            <div className="flex items-center gap-3 flex-1 min-w-0">
-               <div className="relative flex-shrink-0 group">
-                  {person.avatar ? (
-                     <img src={person.avatar} className="w-10 h-10 rounded-full object-cover shadow-sm ring-1 ring-gray-200" alt="" />
-                  ) : (
-                     <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center text-gray-500 shadow-sm ring-1 ring-gray-200">
-                        <User size={20} />
+      <>
+         {isOpen && (
+            <div
+               className="fixed inset-0 bg-black/20 backdrop-blur-sm z-[50]"
+               onClick={onClose}
+            />
+         )}
+         <div className={`fixed inset-y-0 right-0 w-[520px] bg-white shadow-2xl border-l border-gray-200 transform transition-transform duration-300 ease-in-out z-[60] flex flex-col ${isOpen ? 'translate-x-0' : 'translate-x-full'}`} ref={panelRef}>
+            {/* Compact Header */}
+            <div className="flex items-start justify-between px-5 py-4 border-b border-gray-100 bg-gray-50/30">
+               <div className="flex items-center gap-3 flex-1 min-w-0">
+                  <div className="relative flex-shrink-0 group">
+                     <div className="w-10 h-10 rounded-full bg-gradient-to-br from-gray-100 to-gray-200 border border-gray-200 flex items-center justify-center text-gray-600 font-bold shadow-sm text-xs">
+                        {person.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
                      </div>
-                  )}
-               </div>
-               <div className="flex-1 min-w-0">
-                  {editingHeader ? (
-                     <input
-                        autoFocus
-                        className="text-lg font-bold text-gray-900 bg-white border border-blue-500 rounded px-1.5 py-0.5 outline-none w-full shadow-sm"
-                        value={editForm.name}
-                        onChange={(e) => handleUpdateField('name', e.target.value)}
-                        onBlur={() => setEditingHeader(false)}
-                        onKeyDown={(e) => e.key === 'Enter' && setEditingHeader(false)}
-                     />
-                  ) : (
-                     <h2
-                        className="text-lg font-bold text-gray-900 truncate cursor-pointer hover:text-gray-600 flex items-center gap-2 group"
-                        onClick={() => setEditingHeader(true)}
-                     >
-                        {editForm.name}
-                        <Edit2 size={12} className="opacity-0 group-hover:opacity-100 text-gray-400" />
-                     </h2>
-                  )}
-                  <div className="flex items-center gap-2 mt-0.5">
-                     <input
-                        className="bg-transparent border-none outline-none text-xs text-gray-500 hover:text-gray-800 p-0 w-auto truncate focus:ring-0 placeholder:text-gray-300"
-                        value={editForm.role}
-                        onChange={(e) => handleUpdateField('role', e.target.value)}
-                        placeholder="Add role..."
-                     />
                   </div>
-               </div>
-            </div>
-            <button onClick={onClose} className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded ml-2">
-               <X size={18} />
-            </button>
-         </div>
-
-         <div className="flex-1 overflow-y-auto">
-            {/* Quick Actions / Contact Info */}
-            <div className="px-5 py-4 border-b border-gray-100 flex gap-2">
-               <button
-                  className="flex-1 flex items-center justify-center gap-2 py-1.5 border border-gray-200 rounded text-xs font-medium text-gray-600 hover:bg-gray-50 transition-colors"
-                  onClick={() => window.location.href = `mailto:${person.email}`}
-               >
-                  <Mail size={14} /> Email
-               </button>
-               <button className="flex-1 flex items-center justify-center gap-2 py-1.5 border border-gray-200 rounded text-xs font-medium text-gray-600 hover:bg-gray-50 transition-colors">
-                  <Phone size={14} /> Call
-               </button>
-               {person.linkedIn && (
-                  <button
-                     className="flex-1 flex items-center justify-center gap-2 py-1.5 border border-gray-200 rounded text-xs font-medium text-[#0077b5] hover:bg-[#ebf4fa] border-[#0077b5]/20 transition-colors"
-                     onClick={() => window.open(person.linkedIn, '_blank')}
-                  >
-                     <Linkedin size={14} /> LinkedIn
-                  </button>
-               )}
-            </div>
-
-            {/* Dynamic Properties Grid */}
-            <div className="px-5 py-6 border-b border-gray-100">
-               <h3 className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-4 pl-1">Properties</h3>
-               <div className="space-y-1">
-                  {detailColumns.map(col => (
-                     <div key={col.id} className="group grid grid-cols-[140px_1fr] items-start gap-2 py-1 min-h-[32px] hover:bg-gray-50 rounded px-1 -mx-1 relative">
-                        <div className="flex items-center gap-2 text-sm text-gray-500 mt-1.5 overflow-hidden">
-                           <div className="p-1 rounded bg-gray-100 text-gray-500 flex-shrink-0">
-                              <TypeIcon type={col.type} />
-                           </div>
-                           <span className="truncate" title={col.label}>{col.label}</span>
-                        </div>
-                        <div className="relative min-w-0">
-                           {renderFieldInput(col)}
-                        </div>
-
-                        {/* Property Settings Trigger */}
-                        <div
-                           className="absolute left-0 top-1.5 -ml-6 opacity-0 group-hover:opacity-100 cursor-pointer p-1 text-gray-300 hover:text-gray-600 transition-opacity"
-                           onClick={(e) => { e.stopPropagation(); onEditAttribute(col); }}
-                           title="Edit property"
+                  <div className="flex-1 min-w-0">
+                     {editingHeader ? (
+                        <input
+                           autoFocus
+                           className="text-lg font-bold text-gray-900 bg-white border border-blue-500 rounded px-1.5 py-0.5 outline-none w-full shadow-sm"
+                           value={editForm.name}
+                           onChange={(e) => handleUpdateField('name', e.target.value)}
+                           onBlur={() => setEditingHeader(false)}
+                           onKeyDown={(e) => e.key === 'Enter' && setEditingHeader(false)}
+                        />
+                     ) : (
+                        <h2
+                           className="text-lg font-bold text-gray-900 truncate cursor-pointer hover:text-gray-600 flex items-center gap-2 group"
+                           onClick={() => setEditingHeader(true)}
                         >
-                           <Settings size={12} />
-                        </div>
+                           {editForm.name}
+                           <Edit2 size={12} className="opacity-0 group-hover:opacity-100 text-gray-400" />
+                        </h2>
+                     )}
+                     <div className="flex items-center gap-2 mt-0.5">
+                        <input
+                           className="bg-transparent border-none outline-none text-xs text-gray-500 hover:text-gray-800 p-0 w-auto truncate focus:ring-0 placeholder:text-gray-300"
+                           value={editForm.role}
+                           onChange={(e) => handleUpdateField('role', e.target.value)}
+                           placeholder="Add role..."
+                        />
                      </div>
-                  ))}
-
-                  <div
-                     className="flex items-center gap-2 text-xs text-blue-600 hover:text-blue-700 cursor-pointer mt-4 pl-1 py-1"
-                     onClick={onAddProperty}
-                  >
-                     <Plus size={12} /> Add property
                   </div>
                </div>
+               <button onClick={onClose} className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded ml-2">
+                  <X size={18} />
+               </button>
             </div>
 
-            {/* Activity Section Placeholder */}
-            <div className="px-5 py-6">
-               <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-[11px] font-bold text-gray-400 uppercase tracking-wider pl-1">Timeline</h3>
+            <div className="flex-1 overflow-y-auto">
+               {/* Quick Actions / Contact Info */}
+               <div className="px-5 py-4 border-b border-gray-100 flex gap-2">
+                  <button
+                     className="flex-1 flex items-center justify-center gap-2 py-1.5 border border-gray-200 rounded text-xs font-medium text-gray-600 hover:bg-gray-50 transition-colors"
+                     onClick={() => window.location.href = `mailto:${person.email}`}
+                  >
+                     <Mail size={14} /> Email
+                  </button>
+                  <button className="flex-1 flex items-center justify-center gap-2 py-1.5 border border-gray-200 rounded text-xs font-medium text-gray-600 hover:bg-gray-50 transition-colors">
+                     <Phone size={14} /> Call
+                  </button>
+                  {person.linkedIn && (
+                     <button
+                        className="flex-1 flex items-center justify-center gap-2 py-1.5 border border-gray-200 rounded text-xs font-medium text-[#0077b5] hover:bg-[#ebf4fa] border-[#0077b5]/20 transition-colors"
+                        onClick={() => window.open(person.linkedIn, '_blank')}
+                     >
+                        <Linkedin size={14} /> LinkedIn
+                     </button>
+                  )}
                </div>
 
-               {/* Simple timeline mimicking previous implementation but cleaner */}
-               <div className="relative pl-4 space-y-6 before:absolute before:left-[5px] before:top-2 before:bottom-0 before:w-px before:bg-gray-200">
-                  {person.lastInteraction && (
-                     <div className="relative pl-6">
-                        <div className="absolute left-0 top-1.5 w-2.5 h-2.5 rounded-full bg-blue-500 ring-4 ring-white"></div>
-                        <div className="text-sm font-medium text-gray-900">Interaction</div>
-                        <div className="text-xs text-gray-500">{person.lastInteraction}</div>
+               {/* Dynamic Properties Grid */}
+               <div className="px-5 py-6 border-b border-gray-100">
+                  <h3 className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-4 pl-1">Properties</h3>
+                  <div className="space-y-1">
+                     {detailColumns.map(col => (
+                        <div key={col.id} className="group grid grid-cols-[140px_1fr_auto] items-start gap-2 py-1 min-h-[32px] hover:bg-gray-50 rounded px-1 -mx-1">
+                           <div className="flex items-center gap-2 text-sm text-gray-500 mt-1.5 overflow-hidden">
+                              <div className="p-1 rounded bg-gray-100 text-gray-500 flex-shrink-0">
+                                 <TypeIcon type={col.type} />
+                              </div>
+                              <span className="truncate" title={col.label}>{col.label}</span>
+                           </div>
+                           <div className="relative min-w-0">
+                              {renderFieldInput(col)}
+                           </div>
+
+                           {/* Action buttons - Settings & Hide */}
+                           <div className="flex items-center gap-0.5 mt-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <div
+                                 className="cursor-pointer p-1 text-gray-300 hover:text-gray-600 hover:bg-gray-100 rounded"
+                                 onClick={(e) => { e.stopPropagation(); onEditAttribute(col); }}
+                                 title="Edit property"
+                              >
+                                 <Settings size={12} />
+                              </div>
+                              {onToggleVisibility && (
+                                 <div
+                                    className="cursor-pointer p-1 text-gray-300 hover:text-gray-600 hover:bg-gray-100 rounded"
+                                    onClick={(e) => { e.stopPropagation(); onToggleVisibility(col.id); }}
+                                    title="Hide property"
+                                 >
+                                    <EyeOff size={12} />
+                                 </div>
+                              )}
+                           </div>
+                        </div>
+                     ))}
+
+                     <div
+                        className="flex items-center gap-2 text-xs text-blue-600 hover:text-blue-700 cursor-pointer mt-4 pl-1 py-1"
+                        onClick={onAddProperty}
+                     >
+                        <Plus size={12} /> Add property
                      </div>
-                  )}
-                  <div className="relative pl-6">
-                     <div className="absolute left-0 top-1.5 w-2.5 h-2.5 rounded-full bg-gray-300 ring-4 ring-white"></div>
-                     <div className="text-sm font-medium text-gray-900">Created</div>
-                     <div className="text-xs text-gray-500">{new Date(person.createdAt).toLocaleDateString()}</div>
+
+                     {/* Hidden Properties Section */}
+                     {hiddenColumns.length > 0 && (
+                        <div className="mt-4 pt-4 border-t border-gray-100">
+                           <div
+                              className="flex items-center gap-2 text-xs font-medium text-gray-400 uppercase tracking-wider cursor-pointer hover:text-gray-600 mb-2"
+                              onClick={() => setShowHiddenProps(!showHiddenProps)}
+                           >
+                              {showHiddenProps ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+                              {hiddenColumns.length} Hidden properties
+                           </div>
+
+                           {showHiddenProps && (
+                              <div className="space-y-1">
+                                 {hiddenColumns.map(col => (
+                                    <div key={col.id} className="group grid grid-cols-[140px_1fr_auto] items-start gap-2 py-1 min-h-[32px] hover:bg-gray-50 rounded px-1 -mx-1 opacity-70 hover:opacity-100">
+                                       <div className="flex items-center gap-2 text-sm text-gray-500 mt-1.5 overflow-hidden">
+                                          <div className="p-1 rounded bg-gray-100 text-gray-500 flex-shrink-0">
+                                             <TypeIcon type={col.type} />
+                                          </div>
+                                          <span className="truncate" title={col.label}>{col.label}</span>
+                                       </div>
+                                       <div className="relative min-w-0 pointer-events-none grayscale opacity-60">
+                                          {renderFieldInput(col)}
+                                       </div>
+
+                                       {/* Action buttons */}
+                                       <div className="flex items-center gap-0.5 mt-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                                          <div
+                                             className="cursor-pointer p-1 text-gray-300 hover:text-gray-600 hover:bg-gray-100 rounded"
+                                             onClick={(e) => { e.stopPropagation(); onEditAttribute(col); }}
+                                             title="Edit property"
+                                          >
+                                             <Settings size={12} />
+                                          </div>
+                                          {onToggleVisibility && (
+                                             <div
+                                                className="cursor-pointer p-1 text-gray-300 hover:text-gray-600 hover:bg-gray-100 rounded"
+                                                onClick={(e) => { e.stopPropagation(); onToggleVisibility(col.id); }}
+                                                title="Show property"
+                                             >
+                                                <Eye size={12} />
+                                             </div>
+                                          )}
+                                       </div>
+                                    </div>
+                                 ))}
+                              </div>
+                           )}
+                        </div>
+                     )}
+                  </div>
+               </div>
+
+               {/* Activity Section Placeholder */}
+               <div className="px-5 py-6">
+                  <div className="flex items-center justify-between mb-4">
+                     <h3 className="text-[11px] font-bold text-gray-400 uppercase tracking-wider pl-1">Timeline</h3>
+                  </div>
+
+                  {/* Simple timeline mimicking previous implementation but cleaner */}
+                  <div className="relative pl-4 space-y-6 before:absolute before:left-[5px] before:top-2 before:bottom-0 before:w-px before:bg-gray-200">
+                     {person.lastInteraction && (
+                        <div className="relative pl-6">
+                           <div className="absolute left-0 top-1.5 w-2.5 h-2.5 rounded-full bg-blue-500 ring-4 ring-white"></div>
+                           <div className="text-sm font-medium text-gray-900">Interaction</div>
+                           <div className="text-xs text-gray-500">{person.lastInteraction}</div>
+                        </div>
+                     )}
+                     <div className="relative pl-6">
+                        <div className="absolute left-0 top-1.5 w-2.5 h-2.5 rounded-full bg-gray-300 ring-4 ring-white"></div>
+                        <div className="text-sm font-medium text-gray-900">Created</div>
+                        <div className="text-xs text-gray-500">{new Date(person.createdAt).toLocaleDateString()}</div>
+                     </div>
                   </div>
                </div>
             </div>
          </div>
-      </div>
+      </>
    );
 };
 

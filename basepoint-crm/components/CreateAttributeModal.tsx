@@ -17,7 +17,8 @@ import {
    X,
    Globe,
    Plus,
-   Trash2
+   Trash2,
+   Zap
 } from 'lucide-react';
 import { ColumnType, AttributeOption } from '../types';
 import { fetchObjects, ObjectType } from '../utils/schemaApi';
@@ -45,26 +46,20 @@ const ATTRIBUTE_TYPES: { type: ColumnType; label: string; icon: React.ReactNode 
    { type: 'location', label: 'Location', icon: <MapPin size={16} /> },
    { type: 'phone', label: 'Phone Number', icon: <Phone size={16} /> },
    { type: 'url', label: 'URL', icon: <Globe size={16} /> },
+   { type: 'link', label: 'Link', icon: <Zap size={16} /> },
 ];
 
-const TAG_COLORS = [
-   'bg-red-100 text-red-700',
-   'bg-orange-100 text-orange-700',
-   'bg-amber-100 text-amber-700',
-   'bg-yellow-100 text-yellow-700',
-   'bg-lime-100 text-lime-700',
-   'bg-green-100 text-green-700',
-   'bg-emerald-100 text-emerald-700',
-   'bg-teal-100 text-teal-700',
-   'bg-cyan-100 text-cyan-700',
-   'bg-sky-100 text-sky-700',
-   'bg-blue-100 text-blue-700',
-   'bg-indigo-100 text-indigo-700',
-   'bg-violet-100 text-violet-700',
-   'bg-purple-100 text-purple-700',
-   'bg-fuchsia-100 text-fuchsia-700',
-   'bg-pink-100 text-pink-700',
-   'bg-rose-100 text-rose-700',
+const COLOR_OPTIONS = [
+   { name: 'Default', value: 'bg-gray-100 text-gray-700', border: 'border-gray-200' },
+   { name: 'Gray', value: 'bg-gray-200 text-gray-700', border: 'border-gray-300' },
+   { name: 'Brown', value: 'bg-orange-200 text-orange-800', border: 'border-orange-300' },
+   { name: 'Orange', value: 'bg-orange-100 text-orange-700', border: 'border-orange-200' },
+   { name: 'Yellow', value: 'bg-yellow-100 text-yellow-700', border: 'border-yellow-200' },
+   { name: 'Green', value: 'bg-green-100 text-green-700', border: 'border-green-200' },
+   { name: 'Blue', value: 'bg-blue-100 text-blue-700', border: 'border-blue-200' },
+   { name: 'Purple', value: 'bg-purple-100 text-purple-700', border: 'border-purple-200' },
+   { name: 'Pink', value: 'bg-pink-100 text-pink-700', border: 'border-pink-200' },
+   { name: 'Red', value: 'bg-red-100 text-red-700', border: 'border-red-200' },
 ];
 
 const CreateAttributeModal: React.FC<CreateAttributeModalProps> = ({ isOpen, onClose, onSave, initialData }) => {
@@ -73,10 +68,13 @@ const CreateAttributeModal: React.FC<CreateAttributeModalProps> = ({ isOpen, onC
    const [description, setDescription] = useState('');
    const [options, setOptions] = useState<AttributeOption[]>([]);
    const [newOptionLabel, setNewOptionLabel] = useState('');
+   const [newOptionColor, setNewOptionColor] = useState(COLOR_OPTIONS[0].value);
+   const [isColorPickerOpen, setIsColorPickerOpen] = useState(false);
 
    // Relation specific state
    const [availableObjects, setAvailableObjects] = useState<ObjectType[]>([]);
    const [targetObjectId, setTargetObjectId] = useState<string>('');
+   const [abbreviation, setAbbreviation] = useState<string>('');
 
    useEffect(() => {
       if (isOpen) {
@@ -91,12 +89,14 @@ const CreateAttributeModal: React.FC<CreateAttributeModalProps> = ({ isOpen, onC
          setDescription(initialData.description || '');
          setOptions(initialData.config?.options || initialData.options || []);
          setTargetObjectId(initialData.config?.targetObjectId || '');
+         setAbbreviation(initialData.config?.abbreviation || '');
       } else {
          setName('');
          setSelectedType(null);
          setDescription('');
          setOptions([]);
          setTargetObjectId('');
+         setAbbreviation('');
       }
       setNewOptionLabel('');
    }, [initialData, isOpen]);
@@ -123,7 +123,8 @@ const CreateAttributeModal: React.FC<CreateAttributeModalProps> = ({ isOpen, onC
             config: {
                options: (selectedType === 'select' || selectedType === 'multi-select') ? options : undefined,
                targetObjectId: selectedType === 'relation' ? targetObjectId : undefined,
-               cardinality: selectedType === 'relation' ? 'many' : undefined // Default to many-to-many
+               cardinality: selectedType === 'relation' ? 'many' : undefined, // Default to many-to-many
+               abbreviation: selectedType === 'link' ? abbreviation : undefined
             }
          };
          onSave(attributeData);
@@ -133,13 +134,14 @@ const CreateAttributeModal: React.FC<CreateAttributeModalProps> = ({ isOpen, onC
 
    const handleAddOption = () => {
       if (!newOptionLabel.trim()) return;
-      const randomColor = TAG_COLORS[options.length % TAG_COLORS.length];
       setOptions([...options, {
          id: Math.random().toString(36).substr(2, 9),
          label: newOptionLabel.trim(),
-         color: randomColor
+         color: newOptionColor
       }]);
       setNewOptionLabel('');
+      // Reset color to default or keep selected? Usually keeping selected is nice for batch adding, 
+      // but creating a new distinct one might imply reset. I'll keep it for now.
    };
 
    const handleRemoveOption = (id: string) => {
@@ -226,6 +228,21 @@ const CreateAttributeModal: React.FC<CreateAttributeModalProps> = ({ isOpen, onC
                      </div>
                   )}
 
+                  {/* Link Abbreviation (Only for Link type) */}
+                  {selectedType === 'link' && (
+                     <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Abbreviation</label>
+                        <input
+                           className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all bg-white text-gray-900 placeholder:text-gray-400 shadow-sm uppercase"
+                           placeholder="e.g. GA, CS, GONG"
+                           value={abbreviation}
+                           onChange={(e) => setAbbreviation(e.target.value.toUpperCase())}
+                           maxLength={10}
+                        />
+                        <p className="mt-1.5 text-xs text-gray-500">Short code displayed in the Quick Links section (e.g., "GA" for Google Ads).</p>
+                     </div>
+                  )}
+
                   {/* Description */}
                   <div>
                      <label className="block text-sm font-medium text-gray-700 mb-2">Description <span className="text-gray-400 font-normal">(optional)</span></label>
@@ -253,6 +270,42 @@ const CreateAttributeModal: React.FC<CreateAttributeModalProps> = ({ isOpen, onC
                               ))}
                            </div>
                            <div className="flex gap-2">
+                              <div className="relative">
+                                 <button
+                                    onClick={() => setIsColorPickerOpen(!isColorPickerOpen)}
+                                    className={`h-full aspect-square rounded-md border border-gray-300 flex items-center justify-center transition-colors ${newOptionColor}`}
+                                 >
+                                    <div className="w-4 h-4 rounded-full bg-current opacity-50" />
+                                 </button>
+
+                                 {isColorPickerOpen && (
+                                    <>
+                                       <div
+                                          className="fixed inset-0 z-10"
+                                          onClick={() => setIsColorPickerOpen(false)}
+                                       />
+                                       <div className="absolute bottom-full left-0 mb-2 p-2 bg-white rounded-lg shadow-xl border border-gray-200 z-20 w-48 max-h-60 overflow-y-auto">
+                                          <div className="space-y-1">
+                                             {COLOR_OPTIONS.map((color) => (
+                                                <button
+                                                   key={color.name}
+                                                   onClick={() => {
+                                                      setNewOptionColor(color.value);
+                                                      setIsColorPickerOpen(false);
+                                                   }}
+                                                   className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-sm hover:bg-gray-100 transition-colors ${newOptionColor === color.value ? 'bg-gray-50' : ''}`}
+                                                >
+                                                   <span className={`w-4 h-4 rounded-full border ${color.value} ${color.border || 'border-transparent'}`} />
+                                                   <span className="text-gray-700">{color.name}</span>
+                                                   {newOptionColor === color.value && <Check size={14} className="ml-auto text-blue-600" />}
+                                                </button>
+                                             ))}
+                                          </div>
+                                       </div>
+                                    </>
+                                 )}
+                              </div>
+
                               <input
                                  className="flex-1 px-3 py-1.5 border border-gray-300 rounded-md text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 bg-white"
                                  placeholder="Type an option and press Enter..."

@@ -15,9 +15,12 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Plus,
-  Database
+  Database,
+  LayoutList,
+  Columns3,
+  Star
 } from 'lucide-react';
-import { ViewState } from '../types';
+import { ViewState, SavedView } from '../types';
 import { ObjectType } from '../utils/schemaApi';
 import CreateDatabaseModal from './CreateDatabaseModal';
 
@@ -29,6 +32,8 @@ interface SidebarProps {
   onOpenCommandPalette: () => void;
   customObjects: ObjectType[];
   onObjectCreated: () => void;
+  favoriteViews?: SavedView[];
+  onFavoriteViewClick?: (view: SavedView) => void;
 }
 
 const Sidebar: React.FC<SidebarProps> = ({
@@ -38,7 +43,9 @@ const Sidebar: React.FC<SidebarProps> = ({
   onToggleCollapse,
   onOpenCommandPalette,
   customObjects,
-  onObjectCreated
+  onObjectCreated,
+  favoriteViews = [],
+  onFavoriteViewClick
 }) => {
   const [isCreateDbOpen, setIsCreateDbOpen] = useState(false);
 
@@ -71,7 +78,7 @@ const Sidebar: React.FC<SidebarProps> = ({
             <div className="w-5 h-5 bg-gray-900 rounded-md flex items-center justify-center flex-shrink-0">
               <div className="w-2.5 h-2.5 border-2 border-white rounded-full"></div>
             </div>
-            <span className="font-semibold text-gray-800 text-sm truncate">Basepoint</span>
+            <span className="font-semibold text-gray-800 text-sm truncate">Local CRM</span>
             <ChevronDown size={14} className="text-gray-400 flex-shrink-0" />
           </div>
         )}
@@ -128,24 +135,41 @@ const Sidebar: React.FC<SidebarProps> = ({
           </div>
         </div>
 
-        {/* Views (Renamed from Favorites) */}
+        {/* Favorite Views */}
         <div>
           {!isCollapsed && (
             <div className="flex items-center px-2 text-xs font-medium text-gray-500 mb-2">
-              <span className="flex-1 truncate">Views</span>
+              <Star size={12} className="mr-1" />
+              <span className="flex-1 truncate">Favorites</span>
             </div>
           )}
           <div className="space-y-0.5">
-            <div className={navItemClass(false)} title="Onboarding pipeline">
-              {isCollapsed ? <span className="text-lg leading-none">🏗️</span> : <><span className="mr-3 text-lg leading-none">🏗️</span> Onboarding pipeline</>}
-            </div>
-            <div className={navItemClass(false)} title="Top of funnel">
-              <Grid size={16} className={isCollapsed ? "" : "mr-3"} />
-              {!isCollapsed && "Top of funnel"}
-            </div>
-            <div className={navItemClass(false)} title="RevOps workflows">
-              {isCollapsed ? <span className="text-lg leading-none">📂</span> : <><span className="mr-3 text-lg leading-none">📂</span> RevOps workflows</>}
-            </div>
+            {favoriteViews.length === 0 ? (
+              !isCollapsed && (
+                <div className="px-2 py-2 text-xs text-gray-400 italic">
+                  Star views to add them here
+                </div>
+              )
+            ) : (
+              favoriteViews.map(view => {
+                const objectIconColor = view.objectId === 'obj_companies' ? 'text-blue-500' :
+                  view.objectId === 'obj_people' ? 'text-sky-500' :
+                    view.objectId === 'obj_tasks' ? 'text-emerald-500' : 'text-purple-500';
+                const ViewIcon = view.type === 'kanban' ? Columns3 : LayoutList;
+
+                return (
+                  <div
+                    key={view.id}
+                    className={navItemClass(false)}
+                    onClick={() => onFavoriteViewClick?.(view)}
+                    title={view.name}
+                  >
+                    <ViewIcon size={16} className={`${objectIconColor} ${isCollapsed ? "" : "mr-3"}`} />
+                    {!isCollapsed && <span className="truncate">{view.name}</span>}
+                  </div>
+                );
+              })
+            )}
           </div>
         </div>
 

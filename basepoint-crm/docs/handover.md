@@ -1,8 +1,8 @@
-# Basepoint CRM - Developer Handover Documentation
+# Local CRM - Developer Handover Documentation
 
 ## 1. Architecture Overview
 
-Basepoint CRM is a Single Page Application (SPA) built with React. It currently runs entirely client-side with an in-memory "database" managed in the root component state.
+Local CRM is a Single Page Application (SPA) built with React. It currently runs entirely client-side with an in-memory "database" managed in the root component state.
 
 ### Directory Structure
 ```
