@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Person, Company, ColumnDefinition, ColumnType } from '../types';
+import { Person, Company, Activity, ColumnDefinition, ColumnType } from '../types';
 import SearchableSelect from './SearchableSelect';
 import CompanyAvatar from './CompanyAvatar';
+import ActivityTimeline from './ActivityTimeline';
 import {
    X,
    Globe,
@@ -18,7 +19,7 @@ import {
    Star,
    Clock,
    DollarSign,
-   Activity,
+   Activity as ActivityIcon,
    MapPin,
    Phone,
    Layout,
@@ -40,6 +41,7 @@ interface PersonDetailPanelProps {
    isOpen: boolean;
    onClose: () => void;
    companies: Company[];
+   activities: Activity[];
    onUpdate: (person: Person) => void;
    // Dynamic props
    people?: Person[]; // For relations if needed
@@ -47,6 +49,7 @@ interface PersonDetailPanelProps {
    onEditAttribute: (col: ColumnDefinition) => void;
    onAddProperty: () => void;
    onToggleVisibility?: (colId: string) => void;
+   onOpenActivityModal?: (personId: string) => void;
 }
 
 const TypeIcon = ({ type }: { type: ColumnType }) => {
@@ -61,7 +64,7 @@ const TypeIcon = ({ type }: { type: ColumnType }) => {
       case 'rating': return <Star size={14} className="text-gray-400" />;
       case 'timestamp': return <Clock size={14} className="text-gray-400" />;
       case 'currency': return <DollarSign size={14} className="text-gray-400" />;
-      case 'status': return <Activity size={14} className="text-gray-400" />;
+      case 'status': return <ActivityIcon size={14} className="text-gray-400" />;
       case 'location': return <MapPin size={14} className="text-gray-400" />;
       case 'phone': return <Phone size={14} className="text-gray-400" />;
       case 'multi-select': return <Grid2X2 size={14} className="text-gray-400" />;
@@ -74,11 +77,13 @@ const PersonDetailPanel: React.FC<PersonDetailPanelProps> = ({
    isOpen,
    onClose,
    companies,
+   activities,
    onUpdate,
    columns,
    onEditAttribute,
    onAddProperty,
-   onToggleVisibility
+   onToggleVisibility,
+   onOpenActivityModal
 }) => {
    const [editForm, setEditForm] = useState<Person | null>(null);
    const panelRef = useRef<HTMLDivElement>(null);
@@ -429,27 +434,25 @@ const PersonDetailPanel: React.FC<PersonDetailPanelProps> = ({
                   </div>
                </div>
 
-               {/* Activity Section Placeholder */}
-               <div className="px-5 py-6">
-                  <div className="flex items-center justify-between mb-4">
+               {/* Timeline Section */}
+               <div className="py-6">
+                  <div className="flex items-center justify-between mb-4 px-5">
                      <h3 className="text-[11px] font-bold text-gray-400 uppercase tracking-wider pl-1">Timeline</h3>
-                  </div>
-
-                  {/* Simple timeline mimicking previous implementation but cleaner */}
-                  <div className="relative pl-4 space-y-6 before:absolute before:left-[5px] before:top-2 before:bottom-0 before:w-px before:bg-gray-200">
-                     {person.lastInteraction && (
-                        <div className="relative pl-6">
-                           <div className="absolute left-0 top-1.5 w-2.5 h-2.5 rounded-full bg-blue-500 ring-4 ring-white"></div>
-                           <div className="text-sm font-medium text-gray-900">Interaction</div>
-                           <div className="text-xs text-gray-500">{person.lastInteraction}</div>
-                        </div>
+                     {onOpenActivityModal && person && (
+                        <button
+                           onClick={() => onOpenActivityModal(person.id)}
+                           className="text-xs text-blue-600 hover:text-blue-700 font-medium"
+                        >
+                           + Log activity
+                        </button>
                      )}
-                     <div className="relative pl-6">
-                        <div className="absolute left-0 top-1.5 w-2.5 h-2.5 rounded-full bg-gray-300 ring-4 ring-white"></div>
-                        <div className="text-sm font-medium text-gray-900">Created</div>
-                        <div className="text-xs text-gray-500">{new Date(person.createdAt).toLocaleDateString()}</div>
-                     </div>
                   </div>
+                  <ActivityTimeline
+                     activities={activities.filter(a => a.linkedPersonId === person?.id)}
+                     companies={companies}
+                     people={[]}
+                     showCompanyLinks={true}
+                  />
                </div>
             </div>
          </div>

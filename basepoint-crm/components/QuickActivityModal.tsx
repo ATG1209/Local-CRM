@@ -1,32 +1,42 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Company, Task, ParsedTask } from '../types';
+import { Company, Person, Activity, ActivityType, ACTIVITY_TYPE_CONFIGS, ParsedTask } from '../types';
 import { parseTaskInput } from '../utils/taskParser';
 import DatePickerPopover from './DatePickerPopover';
 import SearchableSelect from './SearchableSelect';
 import CompanyAvatar from './CompanyAvatar';
 import FloatingToolbar from './FloatingToolbar';
-import RichTextEditor from './RichTextEditor';
 import { getCaretCoordinates } from '../utils/textareaHelper';
 import {
   Calendar,
-  X
+  X,
+  CheckSquare,
+  Mail,
+  Phone,
+  Calendar as CalendarIcon
 } from 'lucide-react';
 
-interface QuickTaskModalProps {
+interface QuickActivityModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onAddTask: (task: Task) => void;
+  onAddActivity: (activity: Activity) => void;
   companies: Company[];
+  people: Person[];
+  preselectedCompanyId?: string;
+  preselectedPersonId?: string;
 }
 
-const QuickTaskModal: React.FC<QuickTaskModalProps> = ({
+const QuickActivityModal: React.FC<QuickActivityModalProps> = ({
   isOpen,
   onClose,
-  onAddTask,
-  companies
+  onAddActivity,
+  companies,
+  people,
+  preselectedCompanyId,
+  preselectedPersonId
 }) => {
   // --- State ---
+  const [selectedType, setSelectedType] = useState<ActivityType>('task');
   const [titleValue, setTitleValue] = useState('');
   const [descHtml, setDescHtml] = useState('');
 
@@ -37,6 +47,7 @@ const QuickTaskModal: React.FC<QuickTaskModalProps> = ({
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
   const [manualDate, setManualDate] = useState<Date | null>(null);
   const [manualCompanyId, setManualCompanyId] = useState<string | null>(null);
+  const [manualPersonId, setManualPersonId] = useState<string | null>(null);
 
   // @ Mentions in Title
   const [showMentionPicker, setShowMentionPicker] = useState(false);
@@ -47,25 +58,29 @@ const QuickTaskModal: React.FC<QuickTaskModalProps> = ({
   const titleContainerRef = useRef<HTMLDivElement>(null);
   const titleInputRef = useRef<HTMLTextAreaElement>(null);
   const titleOverlayRef = useRef<HTMLDivElement>(null);
-  const titleInputRef = useRef<HTMLTextAreaElement>(null);
-  const titleOverlayRef = useRef<HTMLDivElement>(null);
+  const descEditorRef = useRef<HTMLDivElement>(null);
   const dateTriggerRef = useRef<HTMLDivElement>(null);
 
   // --- Reset on Open ---
   useEffect(() => {
     if (isOpen) {
+      setSelectedType('task');
       setTitleValue('');
       setDescHtml('');
       setParsed(null);
       setManualDate(null);
-      setManualCompanyId(null);
+      setManualCompanyId(preselectedCompanyId || null);
+      setManualPersonId(preselectedPersonId || null);
       setIsDatePickerOpen(false);
       setShowMentionPicker(false);
       setMentionFilter('');
-      setMentionFilter('');
+      // Clear description editor
+      if (descEditorRef.current) {
+        descEditorRef.current.innerHTML = '';
+      }
       setTimeout(() => titleInputRef.current?.focus(), 50);
     }
-  }, [isOpen]);
+  }, [isOpen, preselectedCompanyId, preselectedPersonId]);
 
   // --- Escape Handling ---
   useEffect(() => {
@@ -95,6 +110,7 @@ const QuickTaskModal: React.FC<QuickTaskModalProps> = ({
   // --- Derived Values ---
   const effectiveDate = manualDate || parsed?.dueDate;
   const effectiveCompanyId = manualCompanyId || parsed?.linkedCompany?.id;
+  const effectivePersonId = manualPersonId;
 
   // --- @ Trigger Detection ---
   const handleTitleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -140,25 +156,104 @@ const QuickTaskModal: React.FC<QuickTaskModalProps> = ({
     titleInputRef.current?.focus();
   };
 
+  // --- Description Formatting ---
+  const handleDescInput = () => {
+    if (descEditorRef.current) {
+      setDescHtml(descEditorRef.current.innerHTML);
+    }
+  };
 
+  const handleDescPaste = (e: React.ClipboardEvent) => {
+    e.preventDefault();
+    const text = e.clipboardData.getData('text/plain');
+    const selection = window.getSelection();
+    const isUrl = /^(https?:\/\/)[^\s]+$/.test(text.trim());
+
+    if (isUrl && selection && !selection.isCollapsed) {
+      document.execCommand('createLink', false, text.trim());
+    } else {
+      document.execCommand('insertText', false, text);
+    }
+  };
+
+  const handleDescFormatApply = (format: 'bold' | 'italic' | 'strikethrough' | 'code' | 'link' | 'list', value?: string) => {
+    switch (format) {
+      case 'bold':
+        document.execCommand('bold', false);
+        break;
+      case 'italic':
+        document.execCommand('italic', false);
+        break;
+      case 'strikethrough':
+        document.execCommand('strikeThrough', false);
+        break;
+      case 'code':
+        const selection = window.getSelection();
+        if (selection && !selection.isCollapsed) {
+          const range = selection.getRangeAt(0);
+          const code = document.createElement('code');
+          code.className = 'bg-gray-100 text-gray-800 px-1 py-0.5 rounded text-xs font-mono';
+          range.surroundContents(code);
+        }
+        break;
+      case 'link':
+        if (value) {
+          document.execCommand('createLink', false, value);
+        }
+        break;
+      case 'list':
+        document.execCommand('insertUnorderedList', false);
+        break;
+    }
+    handleDescInput();
+    descEditorRef.current?.focus();
+  };
+
+  // --- Title Link Apply (wraps selected text in anchor, stores in title) ---
+  const handleTitleFormatApply = (format: 'bold' | 'italic' | 'strikethrough' | 'code' | 'link', value?: string) => {
+    if (format !== 'link' || !value) return;
+
+    // For textarea, we need to wrap selected text in anchor tag
+    const input = titleInputRef.current;
+    if (!input) return;
+
+    const start = input.selectionStart;
+    const end = input.selectionEnd;
+
+    if (start === end) return; // No selection
+
+    const selectedText = titleValue.substring(start, end);
+    const beforeText = titleValue.substring(0, start);
+    const afterText = titleValue.substring(end);
+
+    // Create hyperlink markdown-style or HTML-style
+    // For display, we'll use HTML in the overlay and store a simple linked text
+    // Actually for a textarea, we can't really show styled links.
+    // Let's store it as [text](url) markdown style for now
+    const linkedText = `[${selectedText}](${value})`;
+
+    setTitleValue(beforeText + linkedText + afterText);
+  };
 
   // --- Handlers ---
   const handleSubmit = () => {
     if (!titleValue.trim()) return;
 
-    const newTask: Task = {
+    const newActivity: Activity = {
       id: Math.random().toString(36).substr(2, 9),
+      type: selectedType,
       title: parsed ? parsed.cleanTitle : titleValue,
       description: descHtml,
       isCompleted: false,
       dueDate: effectiveDate || null,
       linkedCompanyId: effectiveCompanyId || undefined,
+      linkedPersonId: effectivePersonId || undefined,
       assignedTo: 'you',
       createdBy: 'you',
       createdAt: new Date()
     };
 
-    onAddTask(newTask);
+    onAddActivity(newActivity);
     onClose();
   };
 
@@ -219,6 +314,14 @@ const QuickTaskModal: React.FC<QuickTaskModalProps> = ({
     return dateStr;
   };
 
+  // --- Icon Mapper ---
+  const iconMap = {
+    CheckSquare,
+    Mail,
+    Phone,
+    Calendar: CalendarIcon
+  };
+
   // --- Render ---
   if (!isOpen) return null;
 
@@ -241,8 +344,36 @@ const QuickTaskModal: React.FC<QuickTaskModalProps> = ({
     <div className="fixed inset-0 z-[100] bg-black/40 backdrop-blur-sm flex items-start justify-center pt-[15vh]">
       <div className="w-full max-w-2xl bg-white rounded-2xl shadow-2xl border border-gray-200 overflow-visible animate-in fade-in zoom-in-95 duration-200 relative flex flex-col">
 
-        {/* Header Area: Title + Close Button */}
-        <div className="flex justify-between items-start px-5 pt-5 pb-1 relative">
+        <button
+          onClick={onClose}
+          className="absolute top-4 right-4 p-2 rounded-xl border border-gray-100 bg-white shadow-sm hover:bg-gray-50 text-gray-400 hover:text-gray-600 transition-all z-[110]"
+        >
+          <X size={18} />
+        </button>
+
+        {/* Activity Type Selector */}
+        <div className="flex items-center gap-1 px-5 pt-4 pb-3 border-b border-gray-100">
+          {Object.values(ACTIVITY_TYPE_CONFIGS).map(config => {
+            const Icon = iconMap[config.icon as keyof typeof iconMap];
+            const isSelected = selectedType === config.type;
+            return (
+              <button
+                key={config.type}
+                onClick={() => setSelectedType(config.type)}
+                className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all ${isSelected
+                  ? `bg-${config.color}-50 text-${config.color}-700 border border-${config.color}-200`
+                  : 'text-gray-600 hover:bg-gray-50 border border-transparent'
+                  }`}
+              >
+                <Icon size={16} />
+                {config.label}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Header Area: Title */}
+        <div className="flex justify-between items-start px-6 pt-6 pb-1 relative">
           <div className="flex-1 mr-4 relative" ref={titleContainerRef}>
 
             {/* Title Toolbar - Link Only */}
@@ -266,7 +397,7 @@ const QuickTaskModal: React.FC<QuickTaskModalProps> = ({
                 ref={titleInputRef}
                 className="w-full bg-transparent border-0 outline-none resize-none overflow-hidden relative z-10 text-transparent caret-gray-900"
                 style={typographyStyle}
-                placeholder="Task name (type @ to link company)"
+                placeholder={`${ACTIVITY_TYPE_CONFIGS[selectedType].label} name (type @ to link company)`}
                 value={titleValue}
                 onChange={handleTitleChange}
                 onKeyDown={handleKeyDown}
@@ -304,19 +435,22 @@ const QuickTaskModal: React.FC<QuickTaskModalProps> = ({
             </div>
 
           </div>
-
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors">
-            <X size={20} />
-          </button>
         </div>
 
         {/* Description Input with Floating Toolbar */}
-        <div className="px-5 py-2 min-h-[80px] relative">
-          <RichTextEditor
-            value={descHtml}
-            onChange={setDescHtml}
-            placeholder="Description (select text for formatting)"
-            className="w-full min-h-[60px] py-2 px-0 bg-transparent text-sm text-gray-600 leading-relaxed"
+        <div className="px-6 py-2 min-h-[80px] relative">
+          <FloatingToolbar
+            containerRef={descEditorRef as React.RefObject<HTMLElement>}
+            onFormatApply={handleDescFormatApply}
+          />
+          <div
+            ref={descEditorRef}
+            contentEditable
+            onInput={handleDescInput}
+            onPaste={handleDescPaste}
+            className="w-full min-h-[60px] py-1 px-0 bg-transparent border-0 outline-none text-sm text-gray-600 leading-relaxed [&_a]:text-blue-600 [&_a]:underline empty:before:content-[attr(data-placeholder)] empty:before:text-gray-400 empty:before:pointer-events-none"
+            data-placeholder="Description (select text for formatting)"
+            spellCheck={false}
           />
         </div>
 
@@ -324,19 +458,19 @@ const QuickTaskModal: React.FC<QuickTaskModalProps> = ({
         <div className="h-px bg-gray-100 w-full" />
 
         {/* Actions Footer */}
-        <div className="px-4 py-3 bg-gray-50/50 rounded-b-2xl flex items-center justify-between">
+        <div className="px-6 py-4 bg-gray-50/50 rounded-b-2xl flex items-center justify-between">
           <div className="flex items-center gap-2">
 
             <div className="relative" ref={dateTriggerRef}>
               <button
                 onClick={() => setIsDatePickerOpen(!isDatePickerOpen)}
-                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-medium transition-all ${effectiveDate
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-medium transition-all whitespace-nowrap flex-shrink-0 ${effectiveDate
                   ? 'bg-blue-50 border-blue-200 text-blue-700'
                   : 'bg-white border-gray-200 text-gray-600 hover:border-gray-300 hover:bg-gray-50'
                   }`}
               >
-                <Calendar size={14} className={effectiveDate ? 'text-blue-600' : 'text-gray-500'} />
-                {effectiveDate ? formatDateWithTime(effectiveDate) : 'Due date'}
+                <Calendar size={14} className={effectiveDate ? 'text-blue-600' : 'text-gray-500 flex-shrink-0'} />
+                <span>{effectiveDate ? formatDateWithTime(effectiveDate) : 'Due date'}</span>
               </button>
 
               <DatePickerPopover
@@ -348,38 +482,48 @@ const QuickTaskModal: React.FC<QuickTaskModalProps> = ({
               />
             </div>
 
-            <div className="w-[180px]">
+            <div className="w-[140px] flex-shrink-0">
               <SearchableSelect
                 value={effectiveCompanyId}
                 onChange={setManualCompanyId}
                 options={companies.map(c => ({ id: c.id, label: c.name, icon: <CompanyAvatar name={c.name} size="xs" /> }))}
-                placeholder="Linked to..."
-                className="border border-gray-200 rounded-lg h-[30px] text-xs bg-white hover:bg-gray-50 shadow-sm"
+                placeholder="Linked to company..."
+                className="border border-gray-200 rounded-lg h-[34px] text-xs bg-white hover:bg-gray-50 shadow-sm"
+              />
+            </div>
+
+            <div className="w-[140px] flex-shrink-0">
+              <SearchableSelect
+                value={effectivePersonId}
+                onChange={setManualPersonId}
+                options={people.map(p => ({ id: p.id, label: p.name }))}
+                placeholder="Linked to person..."
+                className="border border-gray-200 rounded-lg h-[34px] text-xs bg-white hover:bg-gray-50 shadow-sm"
               />
             </div>
 
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 flex-shrink-0">
             <button
               onClick={onClose}
-              className="px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 rounded-lg"
+              className="px-5 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-100 rounded-xl whitespace-nowrap"
             >
               Cancel
             </button>
             <button
               onClick={handleSubmit}
               disabled={!titleValue.trim()}
-              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-sm transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-6 py-2.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-md shadow-blue-500/10 transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap active:scale-[0.98]"
             >
-              Add task
+              Add {selectedType}
             </button>
           </div>
         </div>
 
       </div>
-    </div>
+    </div >
   );
 };
 
-export default QuickTaskModal;
+export default QuickActivityModal;

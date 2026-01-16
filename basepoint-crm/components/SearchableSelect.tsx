@@ -52,13 +52,28 @@ const SearchableSelect: React.FC<SearchableSelectProps> = ({
     if (isOpen && inputRef.current) {
       inputRef.current.focus();
     }
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setIsOpen(false);
+        setSearch("");
+      }
+    };
+
+    if (isOpen) {
+      document.addEventListener('keydown', handleKeyDown);
+    }
+
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+    };
   }, [isOpen]);
 
   return (
     <div className={`relative w-full ${className}`} ref={containerRef}>
       {isOpen ? (
         <div
-          className={`absolute ${dropdownPosition === 'top' ? 'bottom-0' : 'top-0'} left-0 z-[100] min-w-[260px] w-full bg-white rounded-lg shadow-xl border border-blue-500 ring-4 ring-blue-500/10 flex flex-col`}
+          className={`absolute ${dropdownPosition === 'top' ? 'bottom-0' : 'top-0'} left-0 z-[100] min-w-[260px] w-full bg-white rounded-lg shadow-xl border border-blue-500 ring-4 ring-blue-500/10 flex flex-col overflow-hidden`}
           style={{
             [dropdownPosition === 'top' ? 'marginBottom' : 'marginTop']: '-4px',
             marginLeft: '-4px',

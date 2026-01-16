@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Local CRM</title>
   <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.tailwindcss.com?plugins=typography"></script>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <style>
     body {
@@ -31,6 +31,29 @@
 
     ::-webkit-scrollbar-thumb:hover {
       background: #d1d5db;
+    }
+
+    /* List styles for rich text editor */
+    .prose ul,
+    .prose-sm ul {
+      list-style-type: disc !important;
+      padding-left: 1.5em !important;
+      margin-top: 0.5em !important;
+      margin-bottom: 0.5em !important;
+    }
+
+    .prose ol,
+    .prose-sm ol {
+      list-style-type: decimal !important;
+      padding-left: 1.5em !important;
+      margin-top: 0.5em !important;
+      margin-bottom: 0.5em !important;
+    }
+
+    .prose li,
+    .prose-sm li {
+      margin-top: 0.125em !important;
+      margin-bottom: 0.125em !important;
     }
   </style>
 </head>

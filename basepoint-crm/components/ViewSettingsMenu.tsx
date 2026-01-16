@@ -33,12 +33,20 @@ const ViewSettingsMenu: React.FC<ViewSettingsMenuProps> = ({
             }
         };
 
+        const handleKeyDown = (event: KeyboardEvent) => {
+            if (event.key === 'Escape') {
+                setIsOpen(false);
+            }
+        };
+
         if (isOpen) {
             document.addEventListener('mousedown', handleClickOutside);
+            document.addEventListener('keydown', handleKeyDown);
         }
 
         return () => {
             document.removeEventListener('mousedown', handleClickOutside);
+            document.removeEventListener('keydown', handleKeyDown);
         };
     }, [isOpen]);
 
@@ -103,22 +111,20 @@ const ViewSettingsMenu: React.FC<ViewSettingsMenuProps> = ({
                         <div className="flex border-b border-gray-200">
                             <button
                                 onClick={() => setActiveTab('columns')}
-                                className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 text-xs font-medium transition-colors ${
-                                    activeTab === 'columns'
+                                className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 text-xs font-medium transition-colors ${activeTab === 'columns'
                                         ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50/50'
                                         : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
-                                }`}
+                                    }`}
                             >
                                 <Columns3 size={14} />
                                 Columns
                             </button>
                             <button
                                 onClick={() => setActiveTab('card')}
-                                className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 text-xs font-medium transition-colors ${
-                                    activeTab === 'card'
+                                className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 text-xs font-medium transition-colors ${activeTab === 'card'
                                         ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50/50'
                                         : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
-                                }`}
+                                    }`}
                             >
                                 <CreditCard size={14} />
                                 Card Fields
@@ -181,17 +187,15 @@ const ViewSettingsMenu: React.FC<ViewSettingsMenuProps> = ({
                                             <div
                                                 key={col.id}
                                                 onClick={() => toggleCardField(col.id)}
-                                                className={`flex items-center gap-2 px-3 py-2 rounded-md cursor-pointer transition-colors ${
-                                                    isSelected
+                                                className={`flex items-center gap-2 px-3 py-2 rounded-md cursor-pointer transition-colors ${isSelected
                                                         ? 'bg-blue-50 text-blue-700'
                                                         : 'hover:bg-gray-50 text-gray-700'
-                                                }`}
+                                                    }`}
                                             >
-                                                <div className={`w-4 h-4 rounded border-2 flex items-center justify-center flex-shrink-0 transition-colors ${
-                                                    isSelected
+                                                <div className={`w-4 h-4 rounded border-2 flex items-center justify-center flex-shrink-0 transition-colors ${isSelected
                                                         ? 'bg-blue-500 border-blue-500'
                                                         : 'border-gray-300'
-                                                }`}>
+                                                    }`}>
                                                     {isSelected && (
                                                         <Check size={10} className="text-white" />
                                                     )}

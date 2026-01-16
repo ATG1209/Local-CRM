@@ -4,14 +4,14 @@ import CompaniesView from './components/CompaniesView';
 const DealsView = React.lazy(() => import('./components/DealsView'));
 const ReportsView = React.lazy(() => import('./components/ReportsView'));
 const WorkflowsView = React.lazy(() => import('./components/WorkflowsView'));
-import TasksView from './components/TasksView';
+import ActivitiesView from './components/ActivitiesView';
 import PeopleView from './components/PeopleView';
 const PlaceholderView = React.lazy(() => import('./components/PlaceholderView'));
 import GenericObjectView from './components/GenericObjectView';
 import TopBar from './components/TopBar';
 import CommandPalette from './components/CommandPalette';
-import QuickTaskModal from './components/QuickTaskModal';
-import { ViewState, Company, Task, Person, SavedView } from './types';
+import QuickActivityModal from './components/QuickActivityModal';
+import { ViewState, Company, Activity, Person, SavedView } from './types';
 import { api } from './utils/api';
 import { fetchObjects, ObjectType } from './utils/schemaApi';
 import { getAllFavoriteViews } from './utils/viewsStorage';
@@ -21,12 +21,12 @@ const App: React.FC = () => {
   const [activeView, setActiveView] = useState<ViewState>('companies');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
-  const [isQuickTaskModalOpen, setIsQuickTaskModalOpen] = useState(false);
-  const [newTaskTrigger, setNewTaskTrigger] = useState(0);
+  const [isQuickActivityModalOpen, setIsQuickActivityModalOpen] = useState(false);
+  const [newActivityTrigger, setNewActivityTrigger] = useState(0);
 
   // --- Centralized Database State ---
   const [companies, setCompanies] = useState<Company[]>([]);
-  const [tasks, setTasks] = useState<Task[]>([]);
+  const [activities, setActivities] = useState<Activity[]>([]);
   const [people, setPeople] = useState<Person[]>([]);
 
   // Custom Objects State
@@ -36,29 +36,29 @@ const App: React.FC = () => {
   const [favoriteViews, setFavoriteViews] = useState<SavedView[]>([]);
   const [selectedViewId, setSelectedViewId] = useState<string | undefined>(undefined);
 
-  const normalizeTaskDates = (task: Task): Task => ({
-    ...task,
-    dueDate: task.dueDate ? new Date(task.dueDate) : null,
-    createdAt: task.createdAt ? new Date(task.createdAt) : new Date()
+  const normalizeActivityDates = (activity: Activity): Activity => ({
+    ...activity,
+    dueDate: activity.dueDate ? new Date(activity.dueDate) : null,
+    createdAt: activity.createdAt ? new Date(activity.createdAt) : new Date()
   });
 
-  const serializeTaskForApi = (task: Task) => ({
-    ...task,
-    dueDate: task.dueDate ? task.dueDate.toISOString() : null,
-    createdAt: task.createdAt ? task.createdAt.toISOString() : new Date().toISOString()
+  const serializeActivityForApi = (activity: Activity) => ({
+    ...activity,
+    dueDate: activity.dueDate ? activity.dueDate.toISOString() : null,
+    createdAt: activity.createdAt ? activity.createdAt.toISOString() : new Date().toISOString()
   });
 
   useEffect(() => {
     const fetchData = async () => {
       console.log("App: Fetching initial data...");
       try {
-        const [fetchedCompanies, fetchedTasks, fetchedPeople] = await Promise.all([
+        const [fetchedCompanies, fetchedActivities, fetchedPeople] = await Promise.all([
           api.get('/companies'),
-          api.get('/tasks'),
+          api.get('/activities'),
           api.get('/people')
         ]);
 
-        console.log("App: Raw data received", { fetchedCompanies, fetchedTasks, fetchedPeople });
+        console.log("App: Raw data received", { fetchedCompanies, fetchedActivities, fetchedPeople });
 
         if (Array.isArray(fetchedCompanies)) {
           setCompanies(fetchedCompanies);
@@ -67,17 +67,17 @@ const App: React.FC = () => {
           setCompanies([]);
         }
 
-        const tasksArray = Array.isArray(fetchedTasks) ? fetchedTasks : [];
-        if (!Array.isArray(fetchedTasks)) {
-          console.warn("App: fetchedTasks is not an array", fetchedTasks);
+        const activitiesArray = Array.isArray(fetchedActivities) ? fetchedActivities : [];
+        if (!Array.isArray(fetchedActivities)) {
+          console.warn("App: fetchedActivities is not an array", fetchedActivities);
         }
 
         try {
-          const parsedTasks = tasksArray.map((t: any) => normalizeTaskDates(t));
-          setTasks(parsedTasks);
+          const parsedActivities = activitiesArray.map((a: any) => normalizeActivityDates(a));
+          setActivities(parsedActivities);
         } catch (parseErr) {
-          console.error("App: Error parsing tasks", parseErr);
-          setTasks([]);
+          console.error("App: Error parsing activities", parseErr);
+          setActivities([]);
         }
 
         if (Array.isArray(fetchedPeople)) {
@@ -161,26 +161,26 @@ const App: React.FC = () => {
     } catch (err) { console.error(err); }
   };
 
-  const handleAddTask = async (task: Task) => {
-    const normalized = normalizeTaskDates(task);
-    setTasks(prev => [normalized, ...prev]);
+  const handleAddActivity = async (activity: Activity) => {
+    const normalized = normalizeActivityDates(activity);
+    setActivities(prev => [normalized, ...prev]);
     try {
-      await api.post('/tasks', serializeTaskForApi(normalized));
+      await api.post('/activities', serializeActivityForApi(normalized));
     } catch (err) { console.error(err); }
   };
 
-  const handleUpdateTask = async (updatedTask: Task) => {
-    const normalized = normalizeTaskDates(updatedTask);
-    setTasks(prev => prev.map(t => t.id === normalized.id ? normalized : t));
+  const handleUpdateActivity = async (updatedActivity: Activity) => {
+    const normalized = normalizeActivityDates(updatedActivity);
+    setActivities(prev => prev.map(a => a.id === normalized.id ? normalized : a));
     try {
-      await api.put(`/tasks/${normalized.id}`, serializeTaskForApi(normalized));
+      await api.put(`/activities/${normalized.id}`, serializeActivityForApi(normalized));
     } catch (err) { console.error(err); }
   };
 
-  const handleDeleteTask = async (id: string) => {
-    setTasks(prev => prev.filter(t => t.id !== id));
+  const handleDeleteActivity = async (id: string) => {
+    setActivities(prev => prev.filter(a => a.id !== id));
     try {
-      await api.delete(`/tasks/${id}`);
+      await api.delete(`/activities/${id}`);
     } catch (err) { console.error(err); }
   };
 
@@ -205,6 +205,34 @@ const App: React.FC = () => {
     } catch (err) { console.error(err); }
   };
 
+  // --- Log Touch Action ---
+  const handleLogTouch = async (companyId: string) => {
+    const company = companies.find(c => c.id === companyId);
+    if (!company) return;
+
+    const now = new Date().toISOString();
+    const updatedCompany = { ...company, lastLoggedAt: now };
+
+    // 1. Update Company
+    handleUpdateCompany(updatedCompany);
+
+    // 2. Create Audit Activity
+    const newActivity: Activity = {
+      id: Math.random().toString(36).substr(2, 9),
+      type: 'call',
+      title: 'Logged touch',
+      description: 'Manual touch log',
+      isCompleted: true, // Auto-completed
+      dueDate: new Date(now), // "Occurred" today
+      createdAt: new Date(now),
+      linkedCompanyId: companyId,
+      createdBy: 'You',
+      assignedTo: 'You'
+    };
+
+    handleAddActivity(newActivity);
+  };
+
   // --- Keyboard Shortcuts ---
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -213,12 +241,12 @@ const App: React.FC = () => {
         setIsCommandPaletteOpen(prev => !prev);
       }
 
-      if (e.key.toLowerCase() === 'q' && !isCommandPaletteOpen && !isQuickTaskModalOpen) {
+      if (e.key.toLowerCase() === 'q' && !isCommandPaletteOpen && !isQuickActivityModalOpen) {
         const target = e.target as HTMLElement;
         const isInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable;
         if (!isInput) {
           e.preventDefault();
-          setIsQuickTaskModalOpen(true);
+          setIsQuickActivityModalOpen(true);
         }
       }
 
@@ -232,7 +260,7 @@ const App: React.FC = () => {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isCommandPaletteOpen, isQuickTaskModalOpen]);
+  }, [isCommandPaletteOpen, isQuickActivityModalOpen]);
 
   const customObject = customObjects.find(o => o.id === activeView);
 
@@ -256,7 +284,7 @@ const App: React.FC = () => {
           <ErrorBoundary>
             <CompaniesView
               companies={companies}
-              tasks={tasks}
+              activities={activities}
               people={people}
               onAddCompany={handleAddCompany}
               onUpdateCompany={handleUpdateCompany}
@@ -287,15 +315,15 @@ const App: React.FC = () => {
       case 'tasks':
         return (
           <ErrorBoundary>
-            <TasksView
-              tasks={tasks}
+            <ActivitiesView
+              activities={activities}
               companies={companies}
               people={people}
-              onAddTask={handleAddTask}
-              onUpdateTask={handleUpdateTask}
-              onDeleteTask={handleDeleteTask}
-              onOpenQuickTask={() => setIsQuickTaskModalOpen(true)}
-              newTaskTrigger={newTaskTrigger}
+              onAddActivity={handleAddActivity}
+              onUpdateActivity={handleUpdateActivity}
+              onDeleteActivity={handleDeleteActivity}
+              onOpenQuickActivity={() => setIsQuickActivityModalOpen(true)}
+              newActivityTrigger={newActivityTrigger}
               initialViewId={selectedViewId}
               onViewFavoriteChange={loadFavorites}
             />
@@ -307,6 +335,7 @@ const App: React.FC = () => {
             <PeopleView
               people={people}
               companies={companies}
+              activities={activities}
               onAddPerson={handleAddPerson}
               onUpdatePerson={handleUpdatePerson}
               onDeletePerson={handleDeletePerson}
@@ -330,7 +359,7 @@ const App: React.FC = () => {
           <ErrorBoundary>
             <CompaniesView
               companies={companies}
-              tasks={tasks}
+              activities={activities}
               people={people}
               onAddCompany={handleAddCompany}
               onUpdateCompany={handleUpdateCompany}
@@ -374,17 +403,18 @@ const App: React.FC = () => {
           onClose={() => setIsCommandPaletteOpen(false)}
           onNavigate={(view) => { setActiveView(view); setIsCommandPaletteOpen(false); }}
           companies={companies}
-          tasks={tasks}
+          activities={activities}
           people={people}
         />
       </ErrorBoundary>
 
       <ErrorBoundary>
-        <QuickTaskModal
-          isOpen={isQuickTaskModalOpen}
-          onClose={() => setIsQuickTaskModalOpen(false)}
-          onAddTask={handleAddTask}
+        <QuickActivityModal
+          isOpen={isQuickActivityModalOpen}
+          onClose={() => setIsQuickActivityModalOpen(false)}
+          onAddActivity={handleAddActivity}
           companies={companies}
+          people={people}
         />
       </ErrorBoundary>
     </div>

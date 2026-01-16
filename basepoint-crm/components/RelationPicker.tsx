@@ -57,6 +57,8 @@ const RelationPicker: React.FC<RelationPickerProps> = ({
 
         const handleKeyDown = (e: KeyboardEvent) => {
             if (e.key === 'Escape') {
+                e.stopPropagation();
+                e.preventDefault();
                 setIsOpen(false);
                 setSearch("");
             }
@@ -121,7 +123,7 @@ const RelationPicker: React.FC<RelationPickerProps> = ({
 
             {/* Dropdown */}
             {isOpen && (
-                <div className="absolute top-0 left-0 z-[100] min-w-[280px] w-full bg-white rounded-lg shadow-xl border border-blue-500 ring-4 ring-blue-500/10 flex flex-col max-h-[360px]">
+                <div className="absolute top-0 left-0 z-[100] min-w-[280px] w-full bg-white rounded-lg shadow-xl border border-blue-500 ring-4 ring-blue-500/10 flex flex-col max-h-[360px] overflow-hidden">
                     {/* Selected items with remove buttons */}
                     {selectedOptions.length > 0 && (
                         <div className="p-2 border-b border-gray-100 flex flex-wrap gap-1">

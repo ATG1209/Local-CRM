@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Task, Company, Person } from '../types';
+import { Task, Company, Person, Activity, ACTIVITY_TYPE_CONFIGS } from '../types';
 import SearchableSelect from './SearchableSelect';
 import DatePickerPopover from './DatePickerPopover';
 import RichTextEditor from './RichTextEditor';
@@ -26,7 +26,7 @@ import {
   Star as StarIcon,
   Clock,
   DollarSign,
-  Activity,
+  Activity as ActivityIcon,
   MapPin,
   Phone,
   Grid2X2,
@@ -49,7 +49,7 @@ const TypeIcon = ({ type }: { type: ColumnType }) => {
     case 'rating': return <StarIcon size={14} className="text-gray-400" />;
     case 'timestamp': return <Clock size={14} className="text-gray-400" />;
     case 'currency': return <DollarSign size={14} className="text-gray-400" />;
-    case 'status': return <Activity size={14} className="text-gray-400" />;
+    case 'status': return <ActivityIcon size={14} className="text-gray-400" />;
     case 'location': return <MapPin size={14} className="text-gray-400" />;
     case 'phone': return <Phone size={14} className="text-gray-400" />;
     case 'multi-select': return <Grid2X2 size={14} className="text-gray-400" />;
@@ -180,7 +180,7 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
                 className="w-full text-2xl font-bold text-gray-900 border-none focus:ring-0 [&_a]:text-blue-600 [&_a]:underline"
                 value={editForm.title}
                 onChange={(val) => updateField('title', val)}
-                placeholder="Task Title"
+                placeholder="Activity Title"
               />
             </div>
 
@@ -265,6 +265,35 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
                                   options={companyOptions}
                                   type="company"
                                   placeholder="Add company..."
+                                />
+                              </div>
+                            );
+                          }
+
+                          if (col.accessorKey === 'type') {
+                            const iconMap = {
+                              CheckSquare: CheckSquare,
+                              Mail: Mail,
+                              Phone: Phone,
+                              Calendar: Calendar
+                            };
+
+                            const typeOptions = Object.values(ACTIVITY_TYPE_CONFIGS).map(config => {
+                              const Icon = iconMap[config.icon as keyof typeof iconMap];
+                              return {
+                                id: config.type,
+                                label: config.label,
+                                icon: Icon ? <Icon size={14} className={`text-${config.color}-600`} /> : undefined
+                              };
+                            });
+
+                            return (
+                              <div className="h-8">
+                                <SearchableSelect
+                                  value={value}
+                                  onChange={(val) => updateField(col.accessorKey as keyof Task, val)}
+                                  options={typeOptions}
+                                  className="border-transparent bg-transparent hover:bg-gray-50 -ml-2"
                                 />
                               </div>
                             );
@@ -384,6 +413,9 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
                     value={editForm.description || ''}
                     onChange={(val) => updateField('description', val)}
                   />
+                  <div className="absolute bottom-2 right-2 text-[10px] text-gray-400 pointer-events-none">
+                    Cmd+Click to open links
+                  </div>
                 </div>
 
               </div>

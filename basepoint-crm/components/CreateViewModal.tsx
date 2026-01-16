@@ -52,12 +52,23 @@ const CreateViewModal: React.FC<CreateViewModalProps> = ({
     }
   }, [isOpen]);
 
-  // Auto-select first groupable attribute when switching to kanban
   useEffect(() => {
     if (viewType === 'kanban' && !groupByAttributeId && groupableAttributes.length > 0) {
       setGroupByAttributeId(groupableAttributes[0].id);
     }
   }, [viewType, groupableAttributes]);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    if (isOpen) {
+      window.addEventListener('keydown', handleKeyDown);
+    }
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
@@ -275,8 +286,8 @@ const CreateViewModal: React.FC<CreateViewModalProps> = ({
                             }`}
                         >
                           <div className={`w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 ${selectedCardFields.includes(col.id)
-                              ? 'bg-blue-500 border-blue-500'
-                              : 'border-gray-300'
+                            ? 'bg-blue-500 border-blue-500'
+                            : 'border-gray-300'
                             }`}>
                             {selectedCardFields.includes(col.id) && <Check size={12} className="text-white" />}
                           </div>

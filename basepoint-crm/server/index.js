@@ -3,10 +3,14 @@ const sqlite3 = require('sqlite3').verbose();
 const cors = require('cors');
 const bodyParser = require('body-parser');
 const path = require('path');
+require('dotenv').config();
 
 const app = express();
-const PORT = 3001;
-const DB_PATH = path.join(__dirname, 'crm.db');
+const PORT = process.env.PORT || 3001;
+// Use DB_PATH from env if available, otherwise default to local file
+const DB_PATH = process.env.DB_PATH
+  ? path.resolve(process.env.DB_PATH)
+  : path.join(__dirname, 'crm.db');
 
 app.use(cors());
 app.use(bodyParser.json());
@@ -371,6 +375,46 @@ function initDb() {
     }
   });
 
+  // Activities table: unified system for tasks, emails, calls, meetings
+  db.run(`
+    CREATE TABLE IF NOT EXISTS activities (
+      id TEXT PRIMARY KEY,
+      type TEXT CHECK(type IN ('task', 'email', 'call', 'meeting')) NOT NULL DEFAULT 'task',
+      title TEXT,
+      description TEXT,
+      isCompleted INTEGER DEFAULT 0,
+      dueDate TEXT,
+      linkedCompanyId TEXT,
+      linkedPersonId TEXT,
+      assignedTo TEXT,
+      createdBy TEXT,
+      createdAt TEXT
+    )
+  `, (err) => {
+    if (!err) {
+      // Check if activities table needs migration from tasks
+      db.get("SELECT count(*) as count FROM activities", (err, row) => {
+        if (!err && row && row.count === 0) {
+          // Migrate existing tasks to activities
+          console.log("Migrating tasks to activities...");
+          db.all("SELECT * FROM tasks", [], (err, tasks) => {
+            if (!err && tasks && tasks.length > 0) {
+              const stmt = db.prepare(`
+                INSERT INTO activities (id, type, title, description, isCompleted, dueDate, linkedCompanyId, linkedPersonId, assignedTo, createdBy, createdAt)
+                VALUES (?, 'task', ?, ?, ?, ?, ?, NULL, ?, ?, ?)
+              `);
+              tasks.forEach(t => {
+                stmt.run(t.id, t.title, t.description || '', t.isCompleted, t.dueDate, t.linkedCompanyId, t.assignedTo, t.createdBy, t.createdAt);
+              });
+              stmt.finalize();
+              console.log(`Migrated ${tasks.length} tasks to activities`);
+            }
+          });
+        }
+      });
+    }
+  });
+
   db.run(`
     CREATE TABLE IF NOT EXISTS deals (
       id TEXT PRIMARY KEY,
@@ -391,9 +435,9 @@ function initDb() {
       db.get("SELECT count(*) as count FROM deals", (err, row) => {
         if (row.count === 0) {
           console.log("Seeding deals...");
-          const stmt = db.prepare("INSERT INTO deals VALUES (?,?,?,?,?,?,?,?,?,?,?)");
+          const stmt = db.prepare("INSERT INTO deals VALUES (?,?,?,?,?,?,?,?,?,?,?,?)");
           MOCK_DEALS.forEach(d => {
-            stmt.run(d.id, d.companyName, d.companyLogo, d.ownerName, d.ownerAvatar, d.value, d.stage, d.tags, d.lastActivity, d.comments, d.tasks);
+            stmt.run(d.id, d.companyName, d.companyLogo, d.ownerName, d.ownerAvatar, d.value, d.stage, d.tags, d.lastActivity, d.comments, d.tasks, new Date().toISOString());
           });
           stmt.finalize();
         }
@@ -421,7 +465,7 @@ function initDb() {
           const systemObjects = [
             { id: 'obj_companies', name: 'Companies', slug: 'companies', icon: 'Building', is_system: 1 },
             { id: 'obj_people', name: 'People', slug: 'people', icon: 'Users', is_system: 1 },
-            { id: 'obj_tasks', name: 'Tasks', slug: 'tasks', icon: 'CheckSquare', is_system: 1 },
+            { id: 'obj_tasks', name: 'Activities', slug: 'tasks', icon: 'CheckSquare', is_system: 1 },
             { id: 'obj_deals', name: 'Deals', slug: 'deals', icon: 'DollarSign', is_system: 1 }
           ];
           const stmt = db.prepare("INSERT INTO objects (id, name, slug, icon, is_system, created_at) VALUES (?,?,?,?,?,?)");
@@ -581,6 +625,15 @@ function initDb() {
       }
     }
   });
+
+  // Migration to rename Tasks to Activities in objects table
+  db.run("UPDATE objects SET name = 'Activities' WHERE id = 'obj_tasks' AND name = 'Tasks'", (err) => {
+    if (err) {
+      console.error("Error updating Tasks to Activities:", err.message);
+    } else {
+      console.log("Updated object name from Tasks to Activities");
+    }
+  });
 }
 
 // Routes
@@ -669,11 +722,82 @@ app.post('/api/people', handleCreate('people'));
 app.put('/api/people/:id', handleUpdate('people'));
 app.delete('/api/people/:id', handleDelete('people'));
 
-// Tasks
+// Tasks (kept for backward compatibility)
 app.get('/api/tasks', handleGet('tasks'));
 app.post('/api/tasks', handleCreate('tasks'));
 app.put('/api/tasks/:id', handleUpdate('tasks'));
 app.delete('/api/tasks/:id', handleDelete('tasks'));
+
+// Activities (unified task/email/call/meeting system)
+app.get('/api/activities', (req, res) => {
+  db.all('SELECT * FROM activities ORDER BY createdAt DESC', [], (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    const parsedRows = rows.map(row => {
+      // Parse JSON fields if necessary
+      for (const key in row) {
+        if (typeof row[key] === 'string' && (row[key].startsWith('[') || row[key].startsWith('{'))) {
+          try {
+            row[key] = JSON.parse(row[key]);
+          } catch (e) { }
+        }
+      }
+      // Boolean conversion
+      if (row.isCompleted !== undefined) {
+        row.isCompleted = !!row.isCompleted;
+      }
+      return row;
+    });
+    res.json(parsedRows);
+  });
+});
+
+app.post('/api/activities', handleCreate('activities'));
+app.put('/api/activities/:id', handleUpdate('activities'));
+app.delete('/api/activities/:id', handleDelete('activities'));
+
+// Get activities by company
+app.get('/api/activities/company/:companyId', (req, res) => {
+  const { companyId } = req.params;
+  db.all('SELECT * FROM activities WHERE linkedCompanyId = ? ORDER BY createdAt DESC', [companyId], (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    const parsedRows = rows.map(row => {
+      for (const key in row) {
+        if (typeof row[key] === 'string' && (row[key].startsWith('[') || row[key].startsWith('{'))) {
+          try {
+            row[key] = JSON.parse(row[key]);
+          } catch (e) { }
+        }
+      }
+      if (row.isCompleted !== undefined) {
+        row.isCompleted = !!row.isCompleted;
+      }
+      return row;
+    });
+    res.json(parsedRows);
+  });
+});
+
+// Get activities by person
+app.get('/api/activities/person/:personId', (req, res) => {
+  const { personId } = req.params;
+  db.all('SELECT * FROM activities WHERE linkedPersonId = ? ORDER BY createdAt DESC', [personId], (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    const parsedRows = rows.map(row => {
+      for (const key in row) {
+        if (typeof row[key] === 'string' && (row[key].startsWith('[') || row[key].startsWith('{'))) {
+          try {
+            row[key] = JSON.parse(row[key]);
+          } catch (e) { }
+        }
+      }
+      if (row.isCompleted !== undefined) {
+        row.isCompleted = !!row.isCompleted;
+      }
+      return row;
+    });
+    res.json(parsedRows);
+  });
+});
 
 // Deals
 app.get('/api/deals', handleGet('deals'));

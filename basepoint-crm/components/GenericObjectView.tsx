@@ -569,7 +569,7 @@ const GenericObjectView: React.FC<GenericObjectViewProps> = ({
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
 
-    // Escape key handler for bulk mode
+    // Escape key handler for bulk mode and other menus
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
             if (e.key === 'Escape' && !e.defaultPrevented) {
@@ -586,6 +586,10 @@ const GenericObjectView: React.FC<GenericObjectViewProps> = ({
                 setBulkActionMenu(null);
                 setIsSortMenuOpen(false);
                 setIsFilterMenuOpen(false);
+                setIsCreateAttributeOpen(false);
+                setIsCreateViewModalOpen(false);
+                setIsImportModalOpen(false);
+                setEditingAttribute(null);
             }
         };
         window.addEventListener('keydown', handleKeyDown);

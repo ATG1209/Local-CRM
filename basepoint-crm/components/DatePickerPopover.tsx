@@ -89,8 +89,13 @@ const DatePickerPopover: React.FC<DatePickerPopoverProps> = ({
         const handleKeyDown = (event: KeyboardEvent) => {
             if (event.key === 'Escape') {
                 event.preventDefault();
-                event.stopImmediatePropagation();
-                handleCloseAttempt();
+                event.stopPropagation();
+
+                if (showDiscardConfirm) {
+                    setShowDiscardConfirm(false);
+                } else {
+                    handleCloseAttempt();
+                }
             }
         };
 

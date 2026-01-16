@@ -36,6 +36,7 @@ export interface Company {
   sensitiveVertical: boolean;
   quarters: string; // Select
   nal: boolean; // True/False
+  lastLoggedAt?: string | null; // ISO String for Log Touch
   createdAt: string; // ISO String
 }
 
@@ -103,6 +104,64 @@ export interface Task {
   createdAt: Date;
   description?: string;
 }
+
+// --- Activity System (Unified task/email/call/meeting) ---
+
+export type ActivityType = 'task' | 'email' | 'call' | 'meeting';
+
+export interface Activity {
+  id: string;
+  type: ActivityType;
+  title: string;
+  description?: string;
+  isCompleted: boolean;
+  dueDate: Date | null;
+  linkedCompanyId?: string;
+  linkedPersonId?: string;  // NEW: Support linking to people
+  assignedTo: string;
+  createdBy: string;
+  createdAt: Date;
+}
+
+// Backward compatibility alias
+export type { Activity as Task };
+
+export interface ActivityTypeConfig {
+  type: ActivityType;
+  label: string;
+  icon: string;  // Lucide icon name
+  color: string; // Tailwind color base (e.g., 'blue', 'purple')
+  defaultDuration?: number; // in minutes
+}
+
+export const ACTIVITY_TYPE_CONFIGS: Record<ActivityType, ActivityTypeConfig> = {
+  task: {
+    type: 'task',
+    label: 'Task',
+    icon: 'CheckSquare',
+    color: 'blue'
+  },
+  email: {
+    type: 'email',
+    label: 'Email',
+    icon: 'Mail',
+    color: 'purple'
+  },
+  call: {
+    type: 'call',
+    label: 'Call',
+    icon: 'Phone',
+    color: 'green',
+    defaultDuration: 30
+  },
+  meeting: {
+    type: 'meeting',
+    label: 'Meeting',
+    icon: 'Calendar',
+    color: 'amber',
+    defaultDuration: 60
+  }
+};
 
 // --- View System Types ---
 

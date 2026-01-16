@@ -1,11 +1,12 @@
 import React from 'react';
-import { Person, Company } from '../types';
+import { Person, Company, Activity } from '../types';
 import GenericObjectView from './GenericObjectView';
 import PersonDetailPanel from './PersonDetailPanel';
 
 interface PeopleViewProps {
    people: Person[];
    companies: Company[];
+   activities: Activity[];
    onAddPerson: (person: Person) => void;
    onUpdatePerson: (person: Person) => void;
    onDeletePerson: (id: string) => void;
@@ -16,6 +17,7 @@ interface PeopleViewProps {
 const PeopleView: React.FC<PeopleViewProps> = ({
    people,
    companies,
+   activities,
    onAddPerson,
    onUpdatePerson,
    onDeletePerson,
@@ -42,6 +44,7 @@ const PeopleView: React.FC<PeopleViewProps> = ({
                onUpdate={onUpdate}
                people={people || []}
                companies={companies}
+               activities={activities}
                columns={columns}
                onEditAttribute={onEditAttribute}
                onAddProperty={onAddProperty}

@@ -75,12 +75,11 @@ const Sidebar: React.FC<SidebarProps> = ({
       {/* Header */}
       <div className={`h-14 flex items-center ${isCollapsed ? 'justify-center' : 'justify-between px-4'} border-b border-gray-100 transition-all`}>
         {!isCollapsed && (
-          <div className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-1 rounded overflow-hidden">
+          <div className="flex items-center gap-2 rounded overflow-hidden">
             <div className="w-5 h-5 bg-gray-900 rounded-md flex items-center justify-center flex-shrink-0">
               <div className="w-2.5 h-2.5 border-2 border-white rounded-full"></div>
             </div>
             <span className="font-semibold text-gray-800 text-sm truncate">Local CRM</span>
-            <ChevronDown size={14} className="text-gray-400 flex-shrink-0" />
           </div>
         )}
         <div
@@ -200,9 +199,9 @@ const Sidebar: React.FC<SidebarProps> = ({
               <Users size={16} className={`text-sky-500 ${isCollapsed ? "" : "mr-3"}`} />
               {!isCollapsed && "People"}
             </div>
-            <div className={navItemClass(activeView === 'tasks' && !activeFavoriteViewId)} onClick={() => onChangeView('tasks')} title="Tasks">
+            <div className={navItemClass(activeView === 'tasks' && !activeFavoriteViewId)} onClick={() => onChangeView('tasks')} title="Activities">
               <CheckSquare size={16} className={`text-emerald-500 ${isCollapsed ? "" : "mr-3"}`} />
-              {!isCollapsed && "Tasks"}
+              {!isCollapsed && "Activities"}
             </div>
 
             {/* Custom Objects */}

@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Company, Person, ColumnDefinition, ColumnType } from '../types';
+import { Company, Person, Activity, ColumnDefinition, ColumnType } from '../types';
 import SearchableSelect from './SearchableSelect';
 import RelationPicker from './RelationPicker';
 import CompanyAvatar from './CompanyAvatar';
+import ActivityTimeline from './ActivityTimeline';
 import {
     X,
     Globe,
@@ -25,24 +26,73 @@ import {
     Star,
     Clock,
     DollarSign,
-    Activity,
+    Activity as ActivityIcon,
     MapPin,
     Phone,
     Layout,
     List,
-    Grid2X2
+    Grid2X2,
+    CalendarX,
+    CalendarClock,
+    ListX,
+    CheckSquare,
+    AlertCircle,
+    CheckCircle,
+    History
 } from 'lucide-react';
+import { CompanyAlert, AlertSegment, AlertSeverity } from '../utils/alertHelper';
+
+// --- Alert Components (Duplicated for now, ideally shared) ---
+const AlertIcon = ({ name, className }: { name: string, className?: string }) => {
+    const size = 14;
+    switch (name) {
+        case 'CalendarX': return <CalendarX size={size} className={className} />;
+        case 'Calendar': return <Calendar size={size} className={className} />;
+        case 'CalendarClock': return <CalendarClock size={size} className={className} />;
+        case 'ListX': return <ListX size={size} className={className} />;
+        case 'CheckSquare': return <CheckSquare size={size} className={className} />;
+        case 'AlertCircle': return <AlertCircle size={size} className={className} />;
+        case 'CheckCircle': return <CheckCircle size={size} className={className} />;
+        case 'Disc': return <Disc size={size} className={className} />;
+        case 'History': return <History size={size} className={className} />;
+        default: return <Calendar size={size} className={className} />;
+    }
+};
+
+const AlertPill = ({ segment }: { segment: AlertSegment }) => {
+    const severityColors: Record<AlertSeverity, string> = {
+        danger: "bg-red-100 text-red-700 border-red-200",
+        warning: "bg-amber-100 text-amber-700 border-amber-200",
+        info: "bg-blue-100 text-blue-700 border-blue-200",
+        success: "bg-green-100 text-green-700 border-green-200",
+        neutral: "bg-gray-100 text-gray-700 border-gray-200"
+    };
+
+    return (
+        <div
+            className={`flex items-center gap-1.5 px-2 py-0.5 rounded-full border text-[10px] font-medium whitespace-nowrap ${severityColors[segment.severity]}`}
+            title={segment.text}
+        >
+            <AlertIcon name={segment.icon} />
+            <span>{segment.text}</span>
+        </div>
+    );
+};
 
 interface CompanyDetailPanelProps {
     company: Company | null;
     isOpen: boolean;
     onClose: () => void;
     people: Person[];
+    activities: Activity[];
     onUpdate: (company: Company) => void;
     columns: ColumnDefinition[];
     onEditAttribute: (col: ColumnDefinition) => void;
     onAddProperty: () => void;
     onToggleVisibility?: (colId: string) => void;
+    onOpenActivityModal?: (companyId: string) => void;
+    onLogTouch?: (companyId: string) => void;
+    computedAlert?: CompanyAlert;
 }
 
 const TypeIcon = ({ type }: { type: ColumnType }) => {
@@ -57,7 +107,7 @@ const TypeIcon = ({ type }: { type: ColumnType }) => {
         case 'rating': return <Star size={14} className="text-gray-400" />;
         case 'timestamp': return <Clock size={14} className="text-gray-400" />;
         case 'currency': return <DollarSign size={14} className="text-gray-400" />;
-        case 'status': return <Activity size={14} className="text-gray-400" />;
+        case 'status': return <ActivityIcon size={14} className="text-gray-400" />;
         case 'location': return <MapPin size={14} className="text-gray-400" />;
         case 'phone': return <Phone size={14} className="text-gray-400" />;
         case 'multi-select': return <Grid2X2 size={14} className="text-gray-400" />;
@@ -71,11 +121,15 @@ const CompanyDetailPanel: React.FC<CompanyDetailPanelProps> = ({
     isOpen,
     onClose,
     people,
+    activities,
     onUpdate,
     columns,
     onEditAttribute,
     onAddProperty,
-    onToggleVisibility
+    onToggleVisibility,
+    onOpenActivityModal,
+    onLogTouch,
+    computedAlert
 }) => {
     const [showHiddenProps, setShowHiddenProps] = useState(false);
     const [editForm, setEditForm] = useState<Company | null>(null);
@@ -354,6 +408,31 @@ const CompanyDetailPanel: React.FC<CompanyDetailPanelProps> = ({
                         </div>
                     )}
 
+                    {/* Alert Section (New) */}
+                    {(computedAlert || onLogTouch) && (
+                        <div className="px-5 py-4 border-b border-gray-100 bg-gray-50/50 flex flex-col gap-3">
+                            <div className="flex items-center justify-between">
+                                <h3 className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Status</h3>
+                                {onLogTouch && (
+                                    <button
+                                        onClick={() => onLogTouch(company.id)}
+                                        className="flex items-center gap-1.5 px-2 py-1 bg-white border border-gray-200 hover:bg-gray-50 hover:border-gray-300 text-xs font-medium text-gray-700 rounded shadow-sm transition-all"
+                                    >
+                                        <History size={12} className="text-gray-400" />
+                                        Log touch
+                                    </button>
+                                )}
+                            </div>
+                            {computedAlert && (
+                                <div className="flex flex-wrap gap-2">
+                                    {computedAlert.segments.map((seg, i) => (
+                                        <AlertPill key={i} segment={seg} />
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    )}
+
                     {/* Dynamic Properties Grid */}
                     <div className="px-5 py-6 border-b border-gray-100">
                         <h3 className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-4 pl-1">Properties</h3>
@@ -438,14 +517,25 @@ const CompanyDetailPanel: React.FC<CompanyDetailPanelProps> = ({
                         </div>
                     </div>
 
-                    {/* Activity Section Placeholder */}
-                    <div className="px-5 py-6">
-                        <div className="flex items-center justify-between mb-4">
+                    {/* Activity Section */}
+                    <div className="py-6">
+                        <div className="flex items-center justify-between mb-4 px-5">
                             <h3 className="text-[11px] font-bold text-gray-400 uppercase tracking-wider pl-1">Activity</h3>
+                            {onOpenActivityModal && company && (
+                                <button
+                                    onClick={() => onOpenActivityModal(company.id)}
+                                    className="text-xs text-blue-600 hover:text-blue-700 font-medium"
+                                >
+                                    + Log activity
+                                </button>
+                            )}
                         </div>
-                        <div className="text-sm text-gray-500 italic pl-1">
-                            No recent activity.
-                        </div>
+                        <ActivityTimeline
+                            activities={activities.filter(a => a.linkedCompanyId === company?.id)}
+                            companies={[]}
+                            people={people}
+                            showPersonLinks={true}
+                        />
                     </div>
                 </div>
             </div>

@@ -33,14 +33,15 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
   // or if external change happens (reset).
   // Here we assume controlled mostly for extraction, but local updates are immediate.
   const [internalHtml, setInternalHtml] = useState(value);
+  const [linkTooltip, setLinkTooltip] = useState<{ url: string; top: number; left: number } | null>(null);
 
   useEffect(() => {
-    if (editorRef.current && value !== editorRef.current.innerHTML && value === '') {
-      // Only force update from props if it's a reset (empty)
-      editorRef.current.innerHTML = '';
-      setInternalHtml('');
+    if (!editorRef.current) return;
+    if (value !== editorRef.current.innerHTML && (!isFocused || value === '')) {
+      editorRef.current.innerHTML = value || '';
+      setInternalHtml(value || '');
     }
-  }, [value]);
+  }, [value, isFocused]);
 
   const handleInput = () => {
     if (!editorRef.current) return;
@@ -61,6 +62,35 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
     // Very basic: check if last char was @
     // Robust User friendly: check if we are in a word starting with @
     // For now: Just Trigger on @ typing
+  };
+
+  const checkForLink = () => {
+    const selection = window.getSelection();
+    if (!selection || !selection.rangeCount) {
+      setLinkTooltip(null);
+      return;
+    }
+
+    let node = selection.anchorNode;
+    // If text node, verify parent
+    if (node && node.nodeType === 3) {
+      node = node.parentNode;
+    }
+
+    const link = (node as HTMLElement)?.closest('a');
+    if (link) {
+      const range = selection.getRangeAt(0);
+      const rect = range.getBoundingClientRect();
+      // Adjust for editor position if needed, but fixed/absolute usually works relative to viewport or parent
+      // using fixed for simplicity relative to viewport
+      setLinkTooltip({
+        url: link.href,
+        top: rect.bottom + 5,
+        left: rect.left
+      });
+    } else {
+      setLinkTooltip(null);
+    }
   };
 
 
@@ -89,13 +119,26 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
         if (value) exec('createLink', value);
         break;
       case 'code':
-        // Basic code implementation if needed, or ignore if RichTextEditor doesn't support it well yet.
-        // Assuming simplistic wrapping for now or ignore.
+        const selection = window.getSelection();
+        if (selection && !selection.isCollapsed) {
+          const range = selection.getRangeAt(0);
+          const wrapper = document.createElement('code');
+          wrapper.className = 'bg-gray-100 text-red-500 px-1 py-0.5 rounded text-sm font-mono';
+          try {
+            const content = range.extractContents();
+            wrapper.appendChild(content);
+            range.insertNode(wrapper);
+            handleInput(); // Sync
+          } catch (e) {
+            console.warn('Cannot apply code format');
+          }
+        }
         break;
     }
   };
 
   const handleKeyUp = (e: React.KeyboardEvent) => {
+    checkForLink();
     if (e.key === '@') {
       const rect = getCaretCoordinates(); // Assuming this helper exists and works
       if (rect && onMentionTrigger) {
@@ -103,6 +146,7 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
       }
     } else if (e.key === ' ' || e.key === 'Escape') {
       if (onMentionClose) onMentionClose();
+      if (e.key === 'Escape') setLinkTooltip(null);
     }
   };
 
@@ -130,21 +174,58 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
     if (onKeyDown) onKeyDown(e);
   };
 
+  const handleClick = (e: React.MouseEvent) => {
+    checkForLink();
+    if (e.metaKey || e.ctrlKey) {
+      // Keep Cmd+Click as a backup
+      let target = e.target as Node;
+      if (target.nodeType === 3) target = target.parentNode as Node;
+      const link = (target as HTMLElement).closest('a');
+      if (link) {
+        e.preventDefault();
+        window.open(link.href, '_blank');
+      }
+    }
+  };
+
   return (
     <>
       <div
         ref={editorRef}
-        className={`outline-none min-h-[1.5em] empty:before:content-[attr(data-placeholder)] empty:before:text-gray-400 cursor-text ${className}`}
+        className={`outline-none min-h-[1.5em] empty:before:content-[attr(data-placeholder)] empty:before:text-gray-400 cursor-text prose prose-sm max-w-none ${className}`}
         contentEditable
         onInput={handleInput}
         onKeyDown={handleKeyDownInternal}
         onKeyUp={handleKeyUp}
+        onClick={handleClick}
         onPaste={handlePaste}
         onFocus={() => setIsFocused(true)}
         onBlur={() => setIsFocused(false)}
         data-placeholder={placeholder}
         spellCheck={false}
       />
+
+      {linkTooltip && (
+        <div
+          className="fixed z-[9999] bg-white border border-gray-200 shadow-lg rounded-md px-2 py-1 flex items-center gap-2 animate-in fade-in zoom-in-95 duration-75"
+          style={{ top: linkTooltip.top, left: linkTooltip.left }}
+        >
+          <a
+            href={linkTooltip.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs text-blue-600 hover:underline max-w-[200px] truncate"
+          >
+            {linkTooltip.url}
+          </a>
+          <button
+            onClick={() => window.open(linkTooltip.url, '_blank')}
+            className="text-gray-400 hover:text-gray-600"
+          >
+            <LinkIcon size={12} />
+          </button>
+        </div>
+      )}
 
       {/* Floating Toolbar */}
       {!singleLine && (

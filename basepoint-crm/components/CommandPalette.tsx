@@ -1,14 +1,14 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Search, Briefcase, Users, CheckSquare, ArrowRight, Command } from 'lucide-react';
-import { ViewState, Company, Task, Person } from '../types';
+import { ViewState, Company, Activity, Person } from '../types';
 
 interface CommandPaletteProps {
    isOpen: boolean;
    onClose: () => void;
    onNavigate: (view: ViewState) => void;
    companies: Company[];
-   tasks: Task[];
+   activities: Activity[];
    people: Person[];
 }
 
@@ -17,7 +17,7 @@ const CommandPalette: React.FC<CommandPaletteProps> = ({
    onClose,
    onNavigate,
    companies,
-   tasks,
+   activities,
    people
 }) => {
    const [query, setQuery] = useState('');
@@ -25,25 +25,25 @@ const CommandPalette: React.FC<CommandPaletteProps> = ({
    const inputRef = useRef<HTMLInputElement>(null);
 
    // Grouped results using props
-   const filteredCompanies = companies.filter(c => c.name.toLowerCase().includes(query.toLowerCase()));
-   const filteredPeople = people.filter(p => p.name.toLowerCase().includes(query.toLowerCase()));
-   const filteredTasks = tasks.filter(t => t.title.toLowerCase().includes(query.toLowerCase()));
+   const filteredCompanies = (companies || []).filter(c => c.name.toLowerCase().includes(query.toLowerCase()));
+   const filteredPeople = (people || []).filter(p => p.name.toLowerCase().includes(query.toLowerCase()));
+   const filteredActivities = (activities || []).filter(a => a.title.toLowerCase().includes(query.toLowerCase()));
 
-   const hasResults = filteredCompanies.length > 0 || filteredPeople.length > 0 || filteredTasks.length > 0;
+   const hasResults = filteredCompanies.length > 0 || filteredPeople.length > 0 || filteredActivities.length > 0;
 
    type ResultItem =
       | { kind: 'company'; entity: Company }
       | { kind: 'person'; entity: Person }
-      | { kind: 'task'; entity: Task };
+      | { kind: 'activity'; entity: Activity };
 
    const resultItems: ResultItem[] = React.useMemo(() => {
       if (!query) return [];
       const items: ResultItem[] = [];
       filteredCompanies.slice(0, 3).forEach(company => items.push({ kind: 'company', entity: company }));
       filteredPeople.slice(0, 3).forEach(person => items.push({ kind: 'person', entity: person }));
-      filteredTasks.slice(0, 3).forEach(task => items.push({ kind: 'task', entity: task }));
+      filteredActivities.slice(0, 3).forEach(activity => items.push({ kind: 'activity', entity: activity }));
       return items;
-   }, [filteredCompanies, filteredPeople, filteredTasks, query]);
+   }, [filteredCompanies, filteredPeople, filteredActivities, query]);
 
    useEffect(() => {
       if (isOpen) {
@@ -116,7 +116,7 @@ const CommandPalette: React.FC<CommandPaletteProps> = ({
                {!query && (
                   <div className="px-4 py-8 text-center text-gray-400 text-sm">
                      <Command size={24} className="mx-auto mb-2 opacity-50" />
-                     <p>Search for companies, people, or tasks.</p>
+                     <p>Search for companies, people, or activities.</p>
                   </div>
                )}
 
@@ -165,21 +165,21 @@ const CommandPalette: React.FC<CommandPaletteProps> = ({
                   </div>
                )}
 
-               {query && filteredTasks.length > 0 && (
+               {query && filteredActivities.length > 0 && (
                   <div className="mb-2">
-                     <div className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider px-3 py-1.5">Tasks</div>
-                     {filteredTasks.slice(0, 3).map(task => (
+                     <div className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider px-3 py-1.5">Activities</div>
+                     {filteredActivities.slice(0, 3).map(activity => (
                         <div
-                           key={task.id}
-                           onClick={() => handleSelect({ kind: 'task', entity: task })}
-                           className={`flex items-center justify-between px-3 py-2 rounded-md cursor-pointer group ${resultItems[selectedIndex] && resultItems[selectedIndex].kind === 'task' && resultItems[selectedIndex].entity.id === task.id ? 'bg-blue-50' : 'hover:bg-gray-100'}`}
+                           key={activity.id}
+                           onClick={() => handleSelect({ kind: 'activity', entity: activity })}
+                           className={`flex items-center justify-between px-3 py-2 rounded-md cursor-pointer group ${resultItems[selectedIndex] && resultItems[selectedIndex].kind === 'activity' && resultItems[selectedIndex].entity.id === activity.id ? 'bg-blue-50' : 'hover:bg-gray-100'}`}
                         >
                            <div className="flex items-center gap-3">
-                              <div className={`w-4 h-4 rounded-full border border-gray-300 ${task.isCompleted ? 'bg-green-500 border-green-500' : 'bg-white'}`}></div>
-                              <span className="text-sm font-medium text-gray-800 line-clamp-1">{task.title}</span>
+                              <div className={`w-4 h-4 rounded-full border border-gray-300 ${activity.isCompleted ? 'bg-green-500 border-green-500' : 'bg-white'}`}></div>
+                              <span className="text-sm font-medium text-gray-800 line-clamp-1">{activity.title}</span>
                            </div>
                            <div className="flex items-center gap-2">
-                              {task.dueDate && <span className="text-[10px] text-gray-400">{new Date(task.dueDate).toLocaleDateString()}</span>}
+                              {activity.dueDate && <span className="text-[10px] text-gray-400">{new Date(activity.dueDate).toLocaleDateString()}</span>}
                               <ArrowRight size={12} className="text-gray-400" />
                            </div>
                         </div>
