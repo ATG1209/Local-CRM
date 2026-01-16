@@ -155,6 +155,9 @@ const GenericObjectView: React.FC<GenericObjectViewProps> = ({
     // Saved Views State
     const [savedViews, setSavedViews] = useState<SavedView[]>([]);
     const [currentView, setCurrentView] = useState<SavedView | null>(null);
+    const [isViewsLoaded, setIsViewsLoaded] = useState(false); // Guard against premature default view creation
+
+    // ... (modal states)
     const [isCreateViewModalOpen, setIsCreateViewModalOpen] = useState(false);
 
     const [isImportModalOpen, setIsImportModalOpen] = useState(false);
@@ -261,29 +264,54 @@ const GenericObjectView: React.FC<GenericObjectViewProps> = ({
         setColumns(applyViewColumns(baseColumns, currentView));
     }, [baseColumns, currentView]);
 
-    // Load saved views
+    // Load saved views with deduplication
     useEffect(() => {
         const views = getViewsForObject(objectId);
-        setSavedViews(views);
+
+        // Deduplicate views based on name + type + objectId to fix previous bug
+        // We keep the first occurrence and valid ones
+        const uniqueViews: SavedView[] = [];
+        const seen = new Set<string>();
+        const duplicates: SavedView[] = [];
+
+        views.forEach(v => {
+            const key = `${v.name}-${v.type}-${v.objectId}`;
+            if (!seen.has(key)) {
+                seen.add(key);
+                uniqueViews.push(v);
+            } else {
+                duplicates.push(v);
+            }
+        });
+
+        // Clean up duplicates from storage
+        if (duplicates.length > 0) {
+            duplicates.forEach(d => deleteViewFromStorage(d.id));
+        }
+
+        setSavedViews(uniqueViews);
 
         // If initialViewId is provided, use that; otherwise use default or first view
         if (initialViewId) {
-            const targetView = views.find(v => v.id === initialViewId);
+            const targetView = uniqueViews.find(v => v.id === initialViewId);
             if (targetView) {
                 setCurrentView(targetView);
+                setIsViewsLoaded(true);
                 return;
             }
         }
 
         // Set current view to default or first view, or create a default table view
-        const defaultView = views.find(v => v.isDefault) || views[0];
+        const defaultView = uniqueViews.find(v => v.isDefault) || uniqueViews[0];
         if (defaultView) {
             setCurrentView(defaultView);
         }
+        setIsViewsLoaded(true);
     }, [objectId, initialViewId]);
 
     useEffect(() => {
-        if (savedViews.length === 0 && columns.length > 0) {
+        // Only run if we have finished checking existing views to avoid race conditions
+        if (isViewsLoaded && savedViews.length === 0 && columns.length > 0) {
             const defaultSort: SortRule[] = columns[0] ? [{ key: columns[0].id, direction: 'asc' }] : [];
             const defaultView: SavedView = {
                 id: generateViewId(),
@@ -298,7 +326,7 @@ const GenericObjectView: React.FC<GenericObjectViewProps> = ({
             setSavedViews([stored]);
             setCurrentView(stored);
         }
-    }, [savedViews.length, columns, objectId, objectName]);
+    }, [isViewsLoaded, savedViews.length, columns, objectId, objectName]);
 
     useEffect(() => {
         if (!currentView) return;
@@ -337,13 +365,54 @@ const GenericObjectView: React.FC<GenericObjectViewProps> = ({
         const storedSort = JSON.stringify(currentView.sort || []);
         const storedFilters = JSON.stringify(currentView.filters || []);
 
-        const isDirty = serializedSort !== storedSort || serializedFilters !== storedFilters;
-        setHasUnsavedChanges(isDirty);
-    }, [sortConfig, filters, currentView]);
+        // Column Comparison
+        // We need to compare the effective column state (visible, width, order) vs currentView.columns
+        // currentView.columns might be partial preference objects in storage, but loaded as full ColumnDefinition?
+        // Actually, savedViews stores full ColumnDefinition[]. 
+        // We should map them to a comparable structure: id, visible, width, and order.
+
+        const serializeCols = (cols: ColumnDefinition[]) => {
+            if (!cols) return '';
+            return JSON.stringify(cols.map(c => ({
+                id: c.id,
+                // Normalize width: treat undefined/null as null, preserve 0
+                w: (typeof c.width === 'number') ? c.width : null,
+                // Normalize visible: treat undefined as true
+                v: c.visible === false ? false : true
+            })));
+        };
+
+        const currentColsStr = serializeCols(columns);
+        const storedColsStr = currentView.columns ? serializeCols(currentView.columns) : '';
+
+        // Note: Sort/Filters might be undefined in view, so default to empty array
+        const isSortDirty = serializedSort !== storedSort;
+        const isFilterDirty = serializedFilters !== storedFilters;
+
+        // If currentView is a saved view but has no columns saved (legacy or bug),
+        // treat as dirty IF we have columns to show (so user knows they should save).
+        // If both are empty (rare), clean.
+        // If storedColsStr is empty but we have columns -> Dirty (new view state).
+        // If storedColsStr matches current -> Clean.
+        const isColumnsDirty = storedColsStr ? currentColsStr !== storedColsStr : columns.length > 0;
+
+        setHasUnsavedChanges(isSortDirty || isFilterDirty || isColumnsDirty);
+    }, [sortConfig, filters, columns, currentView]);
 
     const handleSaveChanges = () => {
         if (!currentView) return;
-        const updated = updateView(currentView.id, { sort: sortConfig, filters });
+        // Save everything: sort, filters, AND columns
+
+        // Ensure we save the minimal preference or full column? 
+        // SavedView type expects ColumnDefinition[]. 
+        // We usually store the full set ordered as is.
+
+        const updated = updateView(currentView.id, {
+            sort: sortConfig,
+            filters,
+            columns: columns
+        });
+
         if (updated) {
             setSavedViews(prev => prev.map(v => v.id === updated.id ? updated : v));
             setCurrentView(updated);
@@ -355,6 +424,16 @@ const GenericObjectView: React.FC<GenericObjectViewProps> = ({
         if (!currentView) return;
         setSortConfig(currentView.sort || []);
         setFilters(currentView.filters || []);
+        if (currentView.columns) {
+            // Re-apply view columns logic using baseColumns + view preferences
+            // Or simpler: just use saved view columns if they are fully stored?
+            // The saved view stores the ordered list of columns.
+
+            // However, we might have new attributes (baseColumns) that are not in the saved view yet?
+            // Safer to re-run applyViewColumns against baseColumns to be consistent with init.
+
+            setColumns(applyViewColumns(baseColumns, currentView));
+        }
     };
 
     useEffect(() => {
@@ -406,7 +485,7 @@ const GenericObjectView: React.FC<GenericObjectViewProps> = ({
     const applyColumnChanges = (updater: (prev: ColumnDefinition[]) => ColumnDefinition[]) => {
         setColumns(prev => {
             const next = updater(prev);
-            persistColumnsToCurrentView(next);
+            // Removed auto-save: persistColumnsToCurrentView(next);
             return next;
         });
     };
@@ -940,6 +1019,27 @@ const GenericObjectView: React.FC<GenericObjectViewProps> = ({
         }
     };
 
+    const handleResetViewDefault = (viewId: string) => {
+        const view = savedViews.find(v => v.id === viewId);
+        if (!view) return;
+
+        // Reset to default: all columns (by clearing preference), no filters, default sort
+        const defaultSort: SortRule[] = baseColumns[0] ? [{ key: baseColumns[0].id, direction: 'asc' }] : [];
+
+        const updated = updateView(viewId, {
+            columns: [],
+            filters: [],
+            sort: defaultSort
+        });
+
+        if (updated) {
+            setSavedViews(prev => prev.map(v => v.id === viewId ? updated : v));
+            if (currentView?.id === viewId) {
+                setCurrentView(updated);
+            }
+        }
+    };
+
     const handleRenameView = (viewId: string, newName: string) => {
         const updated = updateView(viewId, { name: newName });
         if (updated) {
@@ -1364,6 +1464,7 @@ const GenericObjectView: React.FC<GenericObjectViewProps> = ({
                         onCreateView={() => setIsCreateViewModalOpen(true)}
                         onDeleteView={handleDeleteView}
                         onRenameView={handleRenameView}
+                        onResetView={handleResetViewDefault}
                         onToggleFavorite={handleToggleFavorite}
                     />
                     {hasUnsavedChanges && (

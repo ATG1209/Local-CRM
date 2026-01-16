@@ -13,7 +13,8 @@ import {
   Check,
   X,
   Search,
-  Star
+  Star,
+  RotateCcw
 } from 'lucide-react';
 
 interface ViewSelectorProps {
@@ -24,6 +25,7 @@ interface ViewSelectorProps {
   onCreateView: () => void;
   onDeleteView: (viewId: string) => void;
   onRenameView: (viewId: string, newName: string) => void;
+  onResetView?: (viewId: string) => void;
   onToggleFavorite?: (viewId: string) => void;
 }
 
@@ -35,6 +37,7 @@ const ViewSelector: React.FC<ViewSelectorProps> = ({
   onCreateView,
   onDeleteView,
   onRenameView,
+  onResetView,
   onToggleFavorite
 }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -263,8 +266,8 @@ const ViewSelector: React.FC<ViewSelectorProps> = ({
                             onToggleFavorite(view.id);
                           }}
                           className={`p-1 rounded transition-all ${view.isFavorite
-                              ? 'text-yellow-500 opacity-100'
-                              : 'text-gray-300 opacity-0 group-hover:opacity-100 hover:text-yellow-500'
+                            ? 'text-yellow-500 opacity-100'
+                            : 'text-gray-300 opacity-0 group-hover:opacity-100 hover:text-yellow-500'
                             }`}
                           title={view.isFavorite ? 'Remove from favorites' : 'Add to favorites'}
                         >
@@ -339,17 +342,31 @@ const ViewSelector: React.FC<ViewSelectorProps> = ({
             <Pencil size={12} />
             Rename
           </button>
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onDeleteView(activeContextMenuView.id);
-              setContextMenuViewId(null);
-            }}
-            className="w-full flex items-center gap-2 px-3 py-1.5 text-sm text-red-600 hover:bg-red-50"
-          >
-            <Trash2 size={12} />
-            Delete
-          </button>
+          {!activeContextMenuView.isDefault ? (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onDeleteView(activeContextMenuView.id);
+                setContextMenuViewId(null);
+              }}
+              className="w-full flex items-center gap-2 px-3 py-1.5 text-sm text-red-600 hover:bg-red-50"
+            >
+              <Trash2 size={12} />
+              Delete
+            </button>
+          ) : onResetView ? (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onResetView(activeContextMenuView.id);
+                setContextMenuViewId(null);
+              }}
+              className="w-full flex items-center gap-2 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50"
+            >
+              <RotateCcw size={12} />
+              Reset
+            </button>
+          ) : null}
         </div>,
         document.body
       )}

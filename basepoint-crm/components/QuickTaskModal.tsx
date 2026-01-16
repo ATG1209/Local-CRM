@@ -161,7 +161,7 @@ const QuickTaskModal: React.FC<QuickTaskModalProps> = ({
     }
   };
 
-  const handleDescFormatApply = (format: 'bold' | 'italic' | 'strikethrough' | 'code' | 'link', value?: string) => {
+  const handleDescFormatApply = (format: 'bold' | 'italic' | 'strikethrough' | 'code' | 'link' | 'list', value?: string) => {
     switch (format) {
       case 'bold':
         document.execCommand('bold', false);
@@ -185,6 +185,9 @@ const QuickTaskModal: React.FC<QuickTaskModalProps> = ({
         if (value) {
           document.execCommand('createLink', false, value);
         }
+        break;
+      case 'list':
+        document.execCommand('insertUnorderedList', false);
         break;
     }
     handleDescInput();
@@ -413,8 +416,8 @@ const QuickTaskModal: React.FC<QuickTaskModalProps> = ({
               <button
                 onClick={() => setIsDatePickerOpen(!isDatePickerOpen)}
                 className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-medium transition-all ${effectiveDate
-                    ? 'bg-blue-50 border-blue-200 text-blue-700'
-                    : 'bg-white border-gray-200 text-gray-600 hover:border-gray-300 hover:bg-gray-50'
+                  ? 'bg-blue-50 border-blue-200 text-blue-700'
+                  : 'bg-white border-gray-200 text-gray-600 hover:border-gray-300 hover:bg-gray-50'
                   }`}
               >
                 <Calendar size={14} className={effectiveDate ? 'text-blue-600' : 'text-gray-500'} />

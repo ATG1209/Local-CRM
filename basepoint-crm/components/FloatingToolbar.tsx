@@ -1,10 +1,10 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Bold, Italic, Strikethrough, Link as LinkIcon, X, Check, Code } from 'lucide-react';
+import { Bold, Italic, Strikethrough, Link as LinkIcon, X, Check, Code, List } from 'lucide-react';
 
 interface FloatingToolbarProps {
     containerRef: React.RefObject<HTMLElement>;
-    onFormatApply: (format: 'bold' | 'italic' | 'strikethrough' | 'code' | 'link', value?: string) => void;
+    onFormatApply: (format: 'bold' | 'italic' | 'strikethrough' | 'code' | 'link' | 'list', value?: string) => void;
     linkOnly?: boolean; // For title field - only show link button
 }
 
@@ -63,7 +63,7 @@ const FloatingToolbar: React.FC<FloatingToolbarProps> = ({ containerRef, onForma
         }
     }, [showLinkInput]);
 
-    const handleFormat = (format: 'bold' | 'italic' | 'strikethrough' | 'code') => {
+    const handleFormat = (format: 'bold' | 'italic' | 'strikethrough' | 'code' | 'list') => {
         onFormatApply(format);
     };
 
@@ -140,6 +140,13 @@ const FloatingToolbar: React.FC<FloatingToolbarProps> = ({ containerRef, onForma
                                 title="Inline Code"
                             >
                                 <Code size={14} />
+                            </button>
+                            <button
+                                onClick={() => handleFormat('list')}
+                                className="p-1.5 rounded hover:bg-gray-700 transition-colors"
+                                title="Bullet List"
+                            >
+                                <List size={14} />
                             </button>
                             <div className="w-px h-4 bg-gray-700 mx-1" />
                         </>

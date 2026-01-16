@@ -385,9 +385,7 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
                     onChange={(val) => updateField('description', val)}
                   />
                 </div>
-                <div className="absolute bottom-2 right-2 text-[10px] text-gray-400">
-                  Cmd+Click to open links
-                </div>
+
               </div>
             </div>
 

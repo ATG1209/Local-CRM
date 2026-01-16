@@ -45,7 +45,8 @@ const Sidebar: React.FC<SidebarProps> = ({
   customObjects,
   onObjectCreated,
   favoriteViews = [],
-  onFavoriteViewClick
+  onFavoriteViewClick,
+  activeFavoriteViewId
 }) => {
   const [isCreateDbOpen, setIsCreateDbOpen] = useState(false);
 
@@ -160,7 +161,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                 return (
                   <div
                     key={view.id}
-                    className={navItemClass(false)}
+                    className={navItemClass(view.id === activeFavoriteViewId)}
                     onClick={() => onFavoriteViewClick?.(view)}
                     title={view.name}
                   >
@@ -191,15 +192,15 @@ const Sidebar: React.FC<SidebarProps> = ({
             </div>
           )}
           <div className="space-y-0.5">
-            <div className={navItemClass(activeView === 'companies')} onClick={() => onChangeView('companies')} title="Companies">
+            <div className={navItemClass(activeView === 'companies' && !activeFavoriteViewId)} onClick={() => onChangeView('companies')} title="Companies">
               <Briefcase size={16} className={`text-blue-500 ${isCollapsed ? "" : "mr-3"}`} />
               {!isCollapsed && "Companies"}
             </div>
-            <div className={navItemClass(activeView === 'people')} onClick={() => onChangeView('people')} title="People">
+            <div className={navItemClass(activeView === 'people' && !activeFavoriteViewId)} onClick={() => onChangeView('people')} title="People">
               <Users size={16} className={`text-sky-500 ${isCollapsed ? "" : "mr-3"}`} />
               {!isCollapsed && "People"}
             </div>
-            <div className={navItemClass(activeView === 'tasks')} onClick={() => onChangeView('tasks')} title="Tasks">
+            <div className={navItemClass(activeView === 'tasks' && !activeFavoriteViewId)} onClick={() => onChangeView('tasks')} title="Tasks">
               <CheckSquare size={16} className={`text-emerald-500 ${isCollapsed ? "" : "mr-3"}`} />
               {!isCollapsed && "Tasks"}
             </div>
@@ -208,7 +209,7 @@ const Sidebar: React.FC<SidebarProps> = ({
             {displayedCustomObjects.map(obj => (
               <div
                 key={obj.id}
-                className={navItemClass(activeView === obj.id as ViewState)}
+                className={navItemClass(activeView === obj.id as ViewState && !activeFavoriteViewId)} // Assumption: custom object views can also be favorited
                 onClick={() => onChangeView(obj.id as ViewState)}
                 title={obj.name}
               >
@@ -218,7 +219,6 @@ const Sidebar: React.FC<SidebarProps> = ({
             ))}
           </div>
         </div>
-
       </div>
     </div>
   );
