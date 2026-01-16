@@ -13,8 +13,9 @@ export interface CompanyAlert {
     segments: AlertSegment[];
 }
 
-export const computeCompanyAlert = (company: Company, activities: Activity[]): CompanyAlert => {
+export const computeCompanyAlert = (company: Company | null, activities: Activity[]): CompanyAlert => {
     const segments: AlertSegment[] = [];
+    if (!company) return { segments };
 
     // --- 1. Meeting Segment ---
     const meetings = activities.filter(a =>

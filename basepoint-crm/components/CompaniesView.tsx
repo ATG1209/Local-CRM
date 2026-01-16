@@ -76,6 +76,7 @@ const CompaniesView: React.FC<CompaniesViewProps> = ({
    onLogTouch
 }) => {
    const renderAlerts = (company: Company) => {
+      if (!company) return null;
       const alert = computeCompanyAlert(company, activities);
       return (
          <div className="flex items-center gap-2 flex-wrap">
