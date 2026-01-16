@@ -35,9 +35,9 @@ import {
     CalendarX,
     CalendarClock,
     ListX,
-    CheckSquare,
     AlertCircle,
     CheckCircle,
+    Disc,
     History
 } from 'lucide-react';
 import { CompanyAlert, AlertSegment, AlertSeverity } from '../utils/alertHelper';
