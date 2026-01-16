@@ -6,7 +6,7 @@ const ReportsView = React.lazy(() => import('./components/ReportsView'));
 const WorkflowsView = React.lazy(() => import('./components/WorkflowsView'));
 import ActivitiesView from './components/ActivitiesView';
 import PeopleView from './components/PeopleView';
-const PlaceholderView = React.lazy(() => import('./components/PlaceholderView'));
+import PlaceholderView from './components/PlaceholderView';
 import GenericObjectView from './components/GenericObjectView';
 import TopBar from './components/TopBar';
 import CommandPalette from './components/CommandPalette';
