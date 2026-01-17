@@ -167,16 +167,18 @@ const AttributePicker: React.FC<AttributePickerProps> = ({
     );
 };
 
-const AttributeItem = ({
+interface AttributeItemProps {
+    attribute: Attribute;
+    isVisible: boolean;
+    onToggle: () => void;
+    onEdit: () => void;
+}
+
+const AttributeItem: React.FC<AttributeItemProps> = ({
     attribute,
     isVisible,
     onToggle,
     onEdit
-}: {
-    attribute: Attribute,
-    isVisible: boolean,
-    onToggle: () => void,
-    onEdit: () => void
 }) => (
     <div
         className="flex items-center justify-between px-3 py-2 hover:bg-gray-50 cursor-pointer group"

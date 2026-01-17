@@ -5,7 +5,10 @@
     "main": "index.js",
     "scripts": {
         "start": "node index.js",
-        "dev": "node --watch index.js"
+        "dev": "node --watch index.js",
+        "backup": "node backup.js backup",
+        "backup:list": "node backup.js list",
+        "backup:restore": "node backup.js restore"
     },
     "dependencies": {
         "body-parser": "^1.20.2",

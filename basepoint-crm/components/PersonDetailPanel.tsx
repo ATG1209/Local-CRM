@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Person, Company, Activity, ColumnDefinition, ColumnType } from '../types';
+import { ACTIVITY_COLUMNS, ViewState, Company, Activity, Person, SavedView, ColumnDefinition, ColumnType } from '../types';
 import SearchableSelect from './SearchableSelect';
 import CompanyAvatar from './CompanyAvatar';
 import ActivityTimeline from './ActivityTimeline';
+import TaskDetailPanel from './TaskDetailPanel';
 import {
    X,
    Globe,
@@ -50,6 +51,8 @@ interface PersonDetailPanelProps {
    onAddProperty: () => void;
    onToggleVisibility?: (colId: string) => void;
    onOpenActivityModal?: (personId: string) => void;
+   onUpdateActivity: (activity: Activity) => void;
+   onDeleteActivity: (id: string) => void;
 }
 
 const TypeIcon = ({ type }: { type: ColumnType }) => {
@@ -79,16 +82,20 @@ const PersonDetailPanel: React.FC<PersonDetailPanelProps> = ({
    companies,
    activities,
    onUpdate,
+   people,
    columns,
    onEditAttribute,
    onAddProperty,
    onToggleVisibility,
-   onOpenActivityModal
+   onOpenActivityModal,
+   onUpdateActivity,
+   onDeleteActivity
 }) => {
    const [editForm, setEditForm] = useState<Person | null>(null);
    const panelRef = useRef<HTMLDivElement>(null);
    const [editingHeader, setEditingHeader] = useState(false);
    const [showHiddenProps, setShowHiddenProps] = useState(false);
+   const [editingActivity, setEditingActivity] = useState<Activity | null>(null);
 
    useEffect(() => {
       if (person) {
@@ -96,6 +103,26 @@ const PersonDetailPanel: React.FC<PersonDetailPanelProps> = ({
          setEditingHeader(false);
       }
    }, [person]);
+
+   // Handle Escape key to close the panel (unless nested panel is handled first)
+   useEffect(() => {
+      const handleKeyDown = (e: KeyboardEvent) => {
+         if (e.key === 'Escape' && isOpen && !editingActivity) {
+            e.stopPropagation();
+            e.preventDefault();
+            onClose();
+         }
+      };
+
+      if (isOpen) {
+         // Use capture phase to handle before parent panels
+         window.addEventListener('keydown', handleKeyDown, true);
+      }
+
+      return () => {
+         window.removeEventListener('keydown', handleKeyDown, true);
+      };
+   }, [isOpen, onClose, editingActivity]);
 
    useEffect(() => {
       const handleClickOutside = (event: MouseEvent) => {
@@ -112,15 +139,6 @@ const PersonDetailPanel: React.FC<PersonDetailPanelProps> = ({
       };
    }, [isOpen, onClose]);
 
-   useEffect(() => {
-      const handleKeyDown = (e: KeyboardEvent) => {
-         if (e.key === 'Escape') {
-            if (isOpen) onClose();
-         }
-      };
-      window.addEventListener('keydown', handleKeyDown);
-      return () => window.removeEventListener('keydown', handleKeyDown);
-   }, [isOpen, onClose]);
 
    if (!person || !editForm) return null;
 
@@ -138,17 +156,17 @@ const PersonDetailPanel: React.FC<PersonDetailPanelProps> = ({
       icon: <CompanyAvatar name={c.name} size="xs" />
    }));
 
-   const inputClass = "w-full text-sm px-2 py-1 border border-transparent hover:border-gray-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 bg-transparent rounded transition-all outline-none";
+   const inputClass = "w-full text-sm px-0 py-1 border border-transparent hover:border-gray-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 bg-transparent rounded transition-all outline-none";
 
    const renderFieldInput = (col: ColumnDefinition) => {
       const value = (editForm as any)[col.accessorKey];
 
       if (col.readonly) {
          return (
-            <div className="text-sm text-gray-500 py-1">
+            <div className="text-sm text-gray-500 py-1 transition-all">
                {col.type === 'timestamp' || col.type === 'date'
                   ? (value ? new Date(value).toLocaleDateString() : '-')
-                  : (value || '-')}
+                  : (typeof value === 'object' && value !== null ? '-' : (value || '-'))}
             </div>
          );
       }
@@ -156,7 +174,7 @@ const PersonDetailPanel: React.FC<PersonDetailPanelProps> = ({
       // Hardcoded mapping for legacy companyId to Select/Relation
       if (col.accessorKey === 'companyId') {
          return (
-            <div className="h-8">
+            <div className="h-8 flex items-center">
                <RelationPicker
                   value={value}
                   onChange={(newIds) => handleUpdateField(col.accessorKey, newIds[0] || null)} // Legacy single select
@@ -170,9 +188,10 @@ const PersonDetailPanel: React.FC<PersonDetailPanelProps> = ({
 
       switch (col.type) {
          case 'select':
+         case 'multi-select':
             if (col.options && col.options.length > 0) {
                return (
-                  <div className="h-8">
+                  <div className="h-8 flex items-center">
                      <SearchableSelect
                         value={Array.isArray(value) ? value[0] : value}
                         onChange={(val) => handleUpdateField(col.accessorKey, col.type === 'multi-select' ? [val] : val)}
@@ -181,7 +200,7 @@ const PersonDetailPanel: React.FC<PersonDetailPanelProps> = ({
                            label: opt.label,
                            icon: <div className={`w-3 h-3 rounded-full ${opt.color.split(' ')[0]}`}></div>
                         }))}
-                        className="border-transparent bg-transparent hover:bg-gray-50 -ml-2"
+                        className="border-transparent bg-transparent hover:bg-gray-50"
                      />
                   </div>
                );
@@ -214,16 +233,18 @@ const PersonDetailPanel: React.FC<PersonDetailPanelProps> = ({
             );
          case 'checkbox':
             return (
-               <input
-                  type="checkbox"
-                  checked={!!value}
-                  onChange={(e) => handleUpdateField(col.accessorKey, e.target.checked)}
-                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 w-4 h-4 cursor-pointer mt-1.5"
-               />
+               <div className="h-8 flex items-center">
+                  <input
+                     type="checkbox"
+                     checked={!!value}
+                     onChange={(e) => handleUpdateField(col.accessorKey, e.target.checked)}
+                     className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 w-4 h-4 cursor-pointer"
+                  />
+               </div>
             );
          case 'rating':
             return (
-               <div className="flex items-center gap-1 py-1">
+               <div className="flex items-center gap-1 h-8">
                   {[1, 2, 3, 4, 5].map((star) => (
                      <Star
                         key={star}
@@ -238,7 +259,7 @@ const PersonDetailPanel: React.FC<PersonDetailPanelProps> = ({
             if (col.id === 'description' || col.accessorKey === 'description') {
                return (
                   <textarea
-                     className={`${inputClass} min-h-[80px] resize-none`}
+                     className={`${inputClass} min-h-[80px] py-2 resize-none`}
                      value={value || ''}
                      onChange={(e) => handleUpdateField(col.accessorKey, e.target.value)}
                      placeholder="Add notes..."
@@ -271,7 +292,7 @@ const PersonDetailPanel: React.FC<PersonDetailPanelProps> = ({
                onClick={onClose}
             />
          )}
-         <div className={`fixed inset-y-0 right-0 w-[520px] bg-white shadow-2xl border-l border-gray-200 transform transition-transform duration-300 ease-in-out z-[60] flex flex-col ${isOpen ? 'translate-x-0' : 'translate-x-full'}`} ref={panelRef}>
+         <div className={`fixed inset-y-0 right-0 w-[500px] bg-white shadow-2xl border-l border-gray-200 transform transition-transform duration-300 ease-in-out z-[60] flex flex-col ${isOpen ? 'translate-x-0' : 'translate-x-full'}`} ref={panelRef}>
             {/* Compact Header */}
             <div className="flex items-start justify-between px-5 py-4 border-b border-gray-100 bg-gray-50/30">
                <div className="flex items-center gap-3 flex-1 min-w-0">
@@ -341,8 +362,8 @@ const PersonDetailPanel: React.FC<PersonDetailPanelProps> = ({
                   <h3 className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-4 pl-1">Properties</h3>
                   <div className="space-y-1">
                      {detailColumns.map(col => (
-                        <div key={col.id} className="group grid grid-cols-[140px_1fr_auto] items-start gap-2 py-1 min-h-[32px] hover:bg-gray-50 rounded px-1 -mx-1">
-                           <div className="flex items-center gap-2 text-sm text-gray-500 mt-1.5 overflow-hidden">
+                        <div key={col.id} className="group grid grid-cols-[140px_1fr_auto] items-start gap-3 py-1 min-h-[32px] hover:bg-gray-50 rounded px-1 -mx-1">
+                           <div className="flex items-center gap-2 text-sm text-gray-500 min-h-[32px] overflow-hidden">
                               <div className="p-1 rounded bg-gray-100 text-gray-500 flex-shrink-0">
                                  <TypeIcon type={col.type} />
                               </div>
@@ -353,7 +374,7 @@ const PersonDetailPanel: React.FC<PersonDetailPanelProps> = ({
                            </div>
 
                            {/* Action buttons - Settings & Hide */}
-                           <div className="flex items-center gap-0.5 mt-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                           <div className="flex items-center gap-0.5 min-h-[32px] opacity-0 group-hover:opacity-100 transition-opacity">
                               <div
                                  className="cursor-pointer p-1 text-gray-300 hover:text-gray-600 hover:bg-gray-100 rounded"
                                  onClick={(e) => { e.stopPropagation(); onEditAttribute(col); }}
@@ -395,8 +416,8 @@ const PersonDetailPanel: React.FC<PersonDetailPanelProps> = ({
                            {showHiddenProps && (
                               <div className="space-y-1">
                                  {hiddenColumns.map(col => (
-                                    <div key={col.id} className="group grid grid-cols-[140px_1fr_auto] items-start gap-2 py-1 min-h-[32px] hover:bg-gray-50 rounded px-1 -mx-1 opacity-70 hover:opacity-100">
-                                       <div className="flex items-center gap-2 text-sm text-gray-500 mt-1.5 overflow-hidden">
+                                    <div key={col.id} className="group grid grid-cols-[140px_1fr_auto] items-start gap-4 py-1 min-h-[32px] hover:bg-gray-50 rounded px-1 -mx-1 opacity-70 hover:opacity-100">
+                                       <div className="flex items-center gap-2 text-sm text-gray-500 min-h-[32px] overflow-hidden">
                                           <div className="p-1 rounded bg-gray-100 text-gray-500 flex-shrink-0">
                                              <TypeIcon type={col.type} />
                                           </div>
@@ -407,7 +428,7 @@ const PersonDetailPanel: React.FC<PersonDetailPanelProps> = ({
                                        </div>
 
                                        {/* Action buttons */}
-                                       <div className="flex items-center gap-0.5 mt-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                                       <div className="flex items-center gap-0.5 min-h-[32px] opacity-0 group-hover:opacity-100 transition-opacity">
                                           <div
                                              className="cursor-pointer p-1 text-gray-300 hover:text-gray-600 hover:bg-gray-100 rounded"
                                              onClick={(e) => { e.stopPropagation(); onEditAttribute(col); }}
@@ -452,9 +473,24 @@ const PersonDetailPanel: React.FC<PersonDetailPanelProps> = ({
                      companies={companies}
                      people={[]}
                      showCompanyLinks={true}
+                     onOpenActivity={(a) => setEditingActivity(a)}
                   />
                </div>
             </div>
+
+            {/* Activity Detail Panel (Nested) */}
+            <TaskDetailPanel
+               task={editingActivity}
+               isOpen={!!editingActivity}
+               onClose={() => setEditingActivity(null)}
+               companies={companies}
+               people={people || []}
+               onUpdate={onUpdateActivity}
+               onDelete={onDeleteActivity}
+               columns={ACTIVITY_COLUMNS}
+               onEditAttribute={() => { }}
+               onAddProperty={() => { }}
+            />
          </div>
       </>
    );

@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { Activity, ActivityType, ACTIVITY_TYPE_CONFIGS, Company, Person, ColumnDefinition, SavedView } from '../types';
+import { Activity, ActivityType, ACTIVITY_TYPE_CONFIGS, Company, Person, ColumnDefinition, SavedView, ACTIVITY_COLUMNS } from '../types';
 import GenericObjectView from './GenericObjectView';
 import TaskDetailPanel from './TaskDetailPanel';
 import DatePickerPopover from './DatePickerPopover';
@@ -9,7 +9,6 @@ import {
    CheckCircle,
    Circle,
    CheckSquare,
-   Mail,
    Phone,
    Calendar as CalendarIcon
 } from 'lucide-react';
@@ -25,17 +24,10 @@ interface ActivitiesViewProps {
    newActivityTrigger?: number;
    initialViewId?: string;
    onViewFavoriteChange?: () => void;
+   initialRecordId?: string;
 }
 
-const AVAILABLE_COLUMNS: ColumnDefinition[] = [
-   { id: 'type', label: 'Type', type: 'select', accessorKey: 'type', visible: true, width: 120 },
-   { id: 'isCompleted', label: 'Done', type: 'checkbox', accessorKey: 'isCompleted', visible: true, width: 40 },
-   { id: 'title', label: 'Activity', type: 'text', accessorKey: 'title', visible: true, isSystem: true, width: 300 },
-   { id: 'due', label: 'Due Date', type: 'date', accessorKey: 'dueDate', visible: true, width: 160 },
-   { id: 'company', label: 'Company', type: 'relation', accessorKey: 'linkedCompanyId', visible: true, width: 200 },
-   { id: 'person', label: 'Person', type: 'relation', accessorKey: 'linkedPersonId', visible: true, width: 200 },
-   { id: 'assignee', label: 'Assignee', type: 'person', accessorKey: 'assignedTo', visible: true, width: 180 },
-];
+
 
 const ActivitiesView: React.FC<ActivitiesViewProps> = ({
    activities,
@@ -47,6 +39,7 @@ const ActivitiesView: React.FC<ActivitiesViewProps> = ({
    onOpenQuickActivity,
    newActivityTrigger,
    initialViewId,
+   initialRecordId,
    onViewFavoriteChange
 }) => {
 
@@ -57,7 +50,6 @@ const ActivitiesView: React.FC<ActivitiesViewProps> = ({
    // Icon mapper
    const iconMap = {
       CheckSquare,
-      Mail,
       Phone,
       Calendar: CalendarIcon
    };
@@ -92,11 +84,12 @@ const ActivitiesView: React.FC<ActivitiesViewProps> = ({
          data={activities}
          people={people}
          companies={companies}
-         columns={AVAILABLE_COLUMNS}
+         columns={ACTIVITY_COLUMNS}
          onAddRecord={() => onOpenQuickActivity()}
          onUpdateRecord={onUpdateActivity}
          onDeleteRecord={onDeleteActivity}
          initialViewId={initialViewId}
+         initialRecordId={initialRecordId}
          onViewFavoriteChange={onViewFavoriteChange}
 
          // Custom Cell Renderer for activity-specific interactions
@@ -139,8 +132,9 @@ const ActivitiesView: React.FC<ActivitiesViewProps> = ({
                return (
                   <div
                      className={`w-full h-full px-3 flex items-center font-medium ${activity.isCompleted ? 'text-gray-400 line-through' : 'text-gray-900'}`}
-                     dangerouslySetInnerHTML={{ __html: activity.title }}
-                  />
+                  >
+                     {activity.title}
+                  </div>
                );
             }
 

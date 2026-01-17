@@ -125,7 +125,7 @@ const SearchableSelect: React.FC<SearchableSelectProps> = ({
         </div>
       ) : (
         <div
-          className="w-full h-full flex items-center justify-between px-2 cursor-pointer hover:bg-gray-50 group min-h-[28px]"
+          className="w-full h-full flex items-center justify-between pr-2 cursor-pointer hover:bg-gray-50 group min-h-[28px]"
           onClick={() => setIsOpen(true)}
         >
           {selectedOption ? (

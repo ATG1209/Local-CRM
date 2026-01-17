@@ -23,6 +23,8 @@ import {
 import { ViewState, SavedView } from '../types';
 import { ObjectType } from '../utils/schemaApi';
 import CreateDatabaseModal from './CreateDatabaseModal';
+import { getObjectColor } from '../utils/colorHelpers';
+
 
 interface SidebarProps {
   activeView: ViewState;
@@ -34,6 +36,7 @@ interface SidebarProps {
   onObjectCreated: () => void;
   favoriteViews?: SavedView[];
   onFavoriteViewClick?: (view: SavedView) => void;
+  activeFavoriteViewId?: string;
 }
 
 const Sidebar: React.FC<SidebarProps> = ({
@@ -152,9 +155,7 @@ const Sidebar: React.FC<SidebarProps> = ({
               )
             ) : (
               favoriteViews.map(view => {
-                const objectIconColor = view.objectId === 'obj_companies' ? 'text-blue-500' :
-                  view.objectId === 'obj_people' ? 'text-sky-500' :
-                    view.objectId === 'obj_tasks' ? 'text-emerald-500' : 'text-purple-500';
+                const viewTypeColor = view.type === 'kanban' ? 'text-orange-500' : 'text-green-500';
                 const ViewIcon = view.type === 'kanban' ? Columns3 : LayoutList;
 
                 return (
@@ -164,7 +165,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                     onClick={() => onFavoriteViewClick?.(view)}
                     title={view.name}
                   >
-                    <ViewIcon size={16} className={`${objectIconColor} ${isCollapsed ? "" : "mr-3"}`} />
+                    <ViewIcon size={16} className={`${viewTypeColor} ${isCollapsed ? "" : "mr-3"}`} />
                     {!isCollapsed && <span className="truncate">{view.name}</span>}
                   </div>
                 );
@@ -192,15 +193,15 @@ const Sidebar: React.FC<SidebarProps> = ({
           )}
           <div className="space-y-0.5">
             <div className={navItemClass(activeView === 'companies' && !activeFavoriteViewId)} onClick={() => onChangeView('companies')} title="Companies">
-              <Briefcase size={16} className={`text-blue-500 ${isCollapsed ? "" : "mr-3"}`} />
+              <Briefcase size={16} className={`${getObjectColor('obj_companies').text} ${isCollapsed ? "" : "mr-3"}`} />
               {!isCollapsed && "Companies"}
             </div>
             <div className={navItemClass(activeView === 'people' && !activeFavoriteViewId)} onClick={() => onChangeView('people')} title="People">
-              <Users size={16} className={`text-sky-500 ${isCollapsed ? "" : "mr-3"}`} />
+              <Users size={16} className={`${getObjectColor('obj_people').text} ${isCollapsed ? "" : "mr-3"}`} />
               {!isCollapsed && "People"}
             </div>
             <div className={navItemClass(activeView === 'tasks' && !activeFavoriteViewId)} onClick={() => onChangeView('tasks')} title="Activities">
-              <CheckSquare size={16} className={`text-emerald-500 ${isCollapsed ? "" : "mr-3"}`} />
+              <CheckSquare size={16} className={`${getObjectColor('obj_tasks').text} ${isCollapsed ? "" : "mr-3"}`} />
               {!isCollapsed && "Activities"}
             </div>
 
@@ -212,7 +213,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                 onClick={() => onChangeView(obj.id as ViewState)}
                 title={obj.name}
               >
-                <Database size={16} className={`text-purple-500 ${isCollapsed ? "" : "mr-3"}`} />
+                <Database size={16} className={`${getObjectColor(obj.id).text} ${isCollapsed ? "" : "mr-3"}`} />
                 {!isCollapsed && obj.name}
               </div>
             ))}

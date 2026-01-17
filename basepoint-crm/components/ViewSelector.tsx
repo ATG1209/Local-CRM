@@ -16,6 +16,8 @@ import {
   Star,
   RotateCcw
 } from 'lucide-react';
+import { getObjectColor } from '../utils/colorHelpers';
+
 
 interface ViewSelectorProps {
   objectName: string;
@@ -27,6 +29,7 @@ interface ViewSelectorProps {
   onRenameView: (viewId: string, newName: string) => void;
   onResetView?: (viewId: string) => void;
   onToggleFavorite?: (viewId: string) => void;
+  objectId?: string;
 }
 
 const ViewSelector: React.FC<ViewSelectorProps> = ({
@@ -38,7 +41,8 @@ const ViewSelector: React.FC<ViewSelectorProps> = ({
   onDeleteView,
   onRenameView,
   onResetView,
-  onToggleFavorite
+  onToggleFavorite,
+  objectId = 'obj_custom'
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -169,6 +173,8 @@ const ViewSelector: React.FC<ViewSelectorProps> = ({
 
   const displayName = currentView?.name || `All ${pluralize(objectName)}`;
   const displayIcon = currentView ? getViewIcon(currentView.type) : <LayoutList size={14} className="text-green-500" />;
+
+
 
   const activeContextMenuView = views.find(v => v.id === contextMenuViewId);
 

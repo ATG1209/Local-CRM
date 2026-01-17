@@ -85,3 +85,22 @@ export const pluralize = (name: string): string => {
     if (lower.endsWith('s')) return name;
     return name + 's';
 };
+
+/**
+ * Accessor keys and IDs for columns that cannot be deleted
+ */
+export const PROTECTED_COLUMNS = [
+    'name',              // Company/Person Name
+    'title',             // Task/Activity Title
+    'computed_alerts',   // Health & Coverage
+    'lastLoggedAt',      // Last Log At
+    'lastInteraction',   // Last Interaction
+    'createdAt',         // Creation Date
+    'creationDate',      // Creation Date (variant)
+    'domain',            // Company Domain (often core)
+    'email'              // Person Email (often core)
+];
+
+export const isProtectedColumn = (key: string): boolean => {
+    return PROTECTED_COLUMNS.includes(key);
+};

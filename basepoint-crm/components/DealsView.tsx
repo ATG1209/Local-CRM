@@ -13,6 +13,8 @@ import {
   Clock,
   ChevronDown
 } from 'lucide-react';
+import { getObjectColor } from '../utils/colorHelpers';
+
 
 const STAGES: PipelineStage[] = [
   { id: 'Lead', name: 'Lead', count: 212, color: 'bg-cyan-500' },
@@ -65,7 +67,7 @@ const DealsView: React.FC = () => {
       {/* Header */}
       <div className="h-14 border-b border-gray-200 flex items-center justify-between px-6 flex-shrink-0">
         <div className="flex items-center gap-2">
-          <div className="bg-orange-100 text-orange-600 p-1 rounded-md">
+          <div className={`${getObjectColor('obj_deals').bg} ${getObjectColor('obj_deals').text} p-1 rounded-md`}>
             <span className="font-bold text-xs">P</span>
           </div>
           <span className="font-semibold text-gray-900">Pipeline</span>

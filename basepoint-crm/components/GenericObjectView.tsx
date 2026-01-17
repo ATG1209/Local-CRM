@@ -19,6 +19,7 @@ import { applyFilters } from '../utils/filterHelper';
 import { fetchAttributes, createAttribute, updateAttribute, deleteAttribute, Attribute, fetchRecords, createRecord, updateRecord, deleteRecord } from '../utils/schemaApi';
 import { attributeToColumn, pluralize } from '../utils/attributeHelpers';
 import { getViewsForObject, saveView, updateView, deleteView as deleteViewFromStorage, generateViewId, toggleFavorite } from '../utils/viewsStorage';
+import { getObjectColor } from '../utils/colorHelpers';
 import {
     Plus,
     Download,
@@ -64,7 +65,12 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 
-const SortableFilterItem = ({ id, children }: { id: string; children: React.ReactNode }) => {
+interface SortableFilterItemProps {
+    id: string;
+    children: React.ReactNode;
+}
+
+const SortableFilterItem: React.FC<SortableFilterItemProps> = ({ id, children }) => {
     const {
         attributes,
         listeners,
@@ -121,6 +127,7 @@ interface GenericObjectViewProps {
     // Favorites support
     initialViewId?: string; // View to select on mount (from sidebar navigation)
     onViewFavoriteChange?: () => void; // Callback when a view's favorite status changes
+    initialRecordId?: string; // Record to open on mount
 }
 
 const GenericObjectView: React.FC<GenericObjectViewProps> = ({
@@ -137,12 +144,14 @@ const GenericObjectView: React.FC<GenericObjectViewProps> = ({
     columns: externalColumns, // Destructure
     renderCustomCell, // Destructure
     initialViewId,
-    onViewFavoriteChange
+    onViewFavoriteChange,
+    initialRecordId
 }) => {
     const [attributes, setAttributes] = useState<Attribute[]>([]);
     const [baseColumns, setBaseColumns] = useState<ColumnDefinition[]>(externalColumns || []);
     const [columns, setColumns] = useState<ColumnDefinition[]>(externalColumns || []);
-    const [isLoadingAttributes, setIsLoadingAttributes] = useState(false); // Default to false if we have columns
+    const [isLoadingAttributes, setIsLoadingAttributes] = useState(false);
+    const [isSchemaReady, setIsSchemaReady] = useState(false); // True only after async schema load completes
 
     // Internal data state if externalData is not provided
     const [internalData, setInternalData] = useState<any[]>([]);
@@ -209,14 +218,27 @@ const GenericObjectView: React.FC<GenericObjectViewProps> = ({
                 if (!externalColumns) {
                     setBaseColumns(mappedAttrs);
                 } else {
-                    const customAttrs = mappedAttrs.filter(col => !col.isSystem);
-                    setBaseColumns([...externalColumns, ...customAttrs]);
+                    // Merge external columns with schema attributes. 
+                    // CRITICAL: Ensure Company Name (attr_comp_name) is always first.
+                    const nameCol = mappedAttrs.find(a => a.id === 'attr_comp_name');
+                    const externalFiltered = externalColumns.filter(c => c.id !== 'attr_comp_name');
+                    const externalIds = new Set(externalFiltered.map(c => c.id));
+                    externalIds.add('attr_comp_name');
+
+                    const otherMapped = mappedAttrs.filter(attr => !externalIds.has(attr.id));
+
+                    if (nameCol) {
+                        setBaseColumns([nameCol, ...externalFiltered, ...otherMapped]);
+                    } else {
+                        setBaseColumns([...externalFiltered, ...otherMapped]);
+                    }
                 }
             } catch (err) {
                 console.error('Failed to load attributes', err);
                 if (externalColumns) setBaseColumns(externalColumns);
             } finally {
                 setIsLoadingAttributes(false);
+                setIsSchemaReady(true); // Schema is now ready (even on error, we have fallback columns)
             }
 
             // Load data if internal
@@ -264,7 +286,7 @@ const GenericObjectView: React.FC<GenericObjectViewProps> = ({
         setColumns(applyViewColumns(baseColumns, currentView));
     }, [baseColumns, currentView]);
 
-    // Load saved views with deduplication
+    // Load saved views with deduplication and migration
     useEffect(() => {
         const views = getViewsForObject(objectId);
 
@@ -289,6 +311,19 @@ const GenericObjectView: React.FC<GenericObjectViewProps> = ({
             duplicates.forEach(d => deleteViewFromStorage(d.id));
         }
 
+        // MIGRATION: Fix views that have computed columns (like computed_alerts) as sort keys.
+        // These are transient columns that shouldn't be persisted as sort keys.
+        uniqueViews.forEach(v => {
+            if (v.sort && v.sort.length > 0) {
+                const hasComputedSort = v.sort.some(rule => rule.key.startsWith('computed_'));
+                if (hasComputedSort) {
+                    // Clear the sort to let fallback logic pick a proper default
+                    updateView(v.id, { sort: [] });
+                    v.sort = [];
+                }
+            }
+        });
+
         setSavedViews(uniqueViews);
 
         // If initialViewId is provided, use that; otherwise use default or first view
@@ -312,7 +347,9 @@ const GenericObjectView: React.FC<GenericObjectViewProps> = ({
     useEffect(() => {
         // Only run if we have finished checking existing views to avoid race conditions
         if (isViewsLoaded && savedViews.length === 0 && columns.length > 0) {
-            const defaultSort: SortRule[] = columns[0] ? [{ key: columns[0].id, direction: 'asc' }] : [];
+            // Use consistent fallback logic: prefer 'name' or 'title' columns, else first column
+            const sortColumn = columns.find(col => ['name', 'title'].includes(col.accessorKey)) || columns[0];
+            const defaultSort: SortRule[] = sortColumn ? [{ key: sortColumn.id, direction: 'asc' }] : [];
             const defaultView: SavedView = {
                 id: generateViewId(),
                 name: `All ${pluralize(objectName)}`,
@@ -350,54 +387,66 @@ const GenericObjectView: React.FC<GenericObjectViewProps> = ({
         };
     }, [currentView]);
 
+    useEffect(() => {
+        if (initialRecordId && data && data.length > 0) {
+            const record = data.find(r => r.id === initialRecordId);
+            if (record) {
+                setSelectedRecord(record);
+            }
+        }
+    }, [initialRecordId, data]);
+
     // Auto-save logic removed. Now handling changes manually via UI.
     // We compare current state vs view state to determine "dirty" status.
     const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
     useEffect(() => {
-        if (!currentView) {
+        // Guard: Don't calculate dirty state until schema is fully loaded
+        // AND columns has been populated from baseColumns (not just external columns).
+        const hasSchemaColumns = columns.some(col => ['name', 'title'].includes(col.accessorKey));
+        if (!currentView || !isSchemaReady || !hasSchemaColumns) {
             setHasUnsavedChanges(false);
             return;
         }
 
-        const serializedSort = JSON.stringify(sortConfig);
-        const serializedFilters = JSON.stringify(filters);
-        const storedSort = JSON.stringify(currentView.sort || []);
-        const storedFilters = JSON.stringify(currentView.filters || []);
+        // Calculate stable states for comparison (what is expected on load)
+        const stableCols = applyViewColumns(baseColumns, currentView);
+        const stableColsStr = serializeCols(stableCols);
 
-        // Column Comparison
-        // We need to compare the effective column state (visible, width, order) vs currentView.columns
-        // currentView.columns might be partial preference objects in storage, but loaded as full ColumnDefinition?
-        // Actually, savedViews stores full ColumnDefinition[]. 
-        // We should map them to a comparable structure: id, visible, width, and order.
+        // Sort stable state: if currentView.sort is empty, use the same fallback logic 
+        // as setSortConfig to determine what the "clean" default state is.
+        const stableSort = (currentView.sort && currentView.sort.length > 0)
+            ? currentView.sort
+            : (columns.length > 0 ? (() => {
+                const validKeys = new Set(columns.map(col => col.id));
+                const fallbackColumn = columns.find(col => ['name', 'title'].includes(col.accessorKey)) || columns[0];
+                return fallbackColumn ? [{ key: fallbackColumn.id, direction: 'asc' }] : [];
+            })() : []);
+        const stableSortStr = JSON.stringify(stableSort);
 
-        const serializeCols = (cols: ColumnDefinition[]) => {
+        const stableFiltersStr = JSON.stringify(currentView.filters || []);
+
+        // Helper to serialize columns for comparison
+        function serializeCols(cols: ColumnDefinition[]) {
             if (!cols) return '';
             return JSON.stringify(cols.map(c => ({
                 id: c.id,
-                // Normalize width: treat undefined/null as null, preserve 0
                 w: (typeof c.width === 'number') ? c.width : null,
-                // Normalize visible: treat undefined as true
                 v: c.visible === false ? false : true
             })));
-        };
+        }
 
+        // Current states
         const currentColsStr = serializeCols(columns);
-        const storedColsStr = currentView.columns ? serializeCols(currentView.columns) : '';
+        const currentSortStr = JSON.stringify(sortConfig);
+        const currentFiltersStr = JSON.stringify(filters);
 
-        // Note: Sort/Filters might be undefined in view, so default to empty array
-        const isSortDirty = serializedSort !== storedSort;
-        const isFilterDirty = serializedFilters !== storedFilters;
-
-        // If currentView is a saved view but has no columns saved (legacy or bug),
-        // treat as dirty IF we have columns to show (so user knows they should save).
-        // If both are empty (rare), clean.
-        // If storedColsStr is empty but we have columns -> Dirty (new view state).
-        // If storedColsStr matches current -> Clean.
-        const isColumnsDirty = storedColsStr ? currentColsStr !== storedColsStr : columns.length > 0;
+        const isSortDirty = currentSortStr !== stableSortStr;
+        const isFilterDirty = currentFiltersStr !== stableFiltersStr;
+        const isColumnsDirty = currentColsStr !== stableColsStr;
 
         setHasUnsavedChanges(isSortDirty || isFilterDirty || isColumnsDirty);
-    }, [sortConfig, filters, columns, currentView]);
+    }, [sortConfig, filters, columns, currentView, baseColumns, isSchemaReady]);
 
     const handleSaveChanges = () => {
         if (!currentView) return;
@@ -437,7 +486,13 @@ const GenericObjectView: React.FC<GenericObjectViewProps> = ({
     };
 
     useEffect(() => {
-        if (columns.length === 0) return;
+        // Guard: Don't apply sort/filter normalization until schema is ready
+        // AND columns has been populated from baseColumns (not just external columns).
+        // We check for a column with 'name' or 'title' accessor to ensure schema is loaded.
+        if (columns.length === 0 || !isSchemaReady) return;
+
+        const hasSchemaColumns = columns.some(col => ['name', 'title'].includes(col.accessorKey));
+        if (!hasSchemaColumns) return; // Schema columns haven't loaded into columns yet
 
         setSortConfig(prev => {
             const validKeys = new Set(columns.map(col => col.id));
@@ -448,7 +503,7 @@ const GenericObjectView: React.FC<GenericObjectViewProps> = ({
         });
 
         setFilters(prev => prev.filter(rule => columns.some(col => col.id === rule.columnId)));
-    }, [columns]);
+    }, [columns, isSchemaReady]);
 
     useEffect(() => {
         sortConfigRef.current = sortConfig;
@@ -1429,6 +1484,12 @@ const GenericObjectView: React.FC<GenericObjectViewProps> = ({
                 onClose={() => { setIsCreateAttributeOpen(false); setEditingAttribute(null); }}
                 onSave={handleSaveAttribute}
                 initialData={editingAttribute}
+                onDelete={(id: string) => {
+                    const col = columns.find(c => c.id === id);
+                    if (col) {
+                        handleDeleteAttribute(col);
+                    }
+                }}
             />
             <CreateViewModal
                 isOpen={isCreateViewModalOpen}
@@ -1445,11 +1506,7 @@ const GenericObjectView: React.FC<GenericObjectViewProps> = ({
             <div className="h-14 border-b border-gray-200 flex items-center justify-between px-4 flex-shrink-0 bg-white z-40">
                 <div className="flex items-center gap-3">
                     <div className="flex items-center gap-2">
-                        <div className={`${objectId === 'obj_companies' ? 'bg-blue-50 text-blue-500' :
-                            objectId === 'obj_people' ? 'bg-sky-50 text-sky-500' :
-                                objectId === 'obj_tasks' ? 'bg-emerald-50 text-emerald-500' :
-                                    'bg-purple-50 text-purple-500'
-                            } p-1.5 rounded-md`}>
+                        <div className={`${getObjectColor(objectId).bg} ${getObjectColor(objectId).text} p-1.5 rounded-md`}>
                             {objectId === 'obj_companies' ? <Briefcase size={16} /> :
                                 objectId === 'obj_people' ? <Users size={16} /> :
                                     objectId === 'obj_tasks' ? <CheckSquare size={16} /> :
@@ -1461,6 +1518,7 @@ const GenericObjectView: React.FC<GenericObjectViewProps> = ({
                     </div>
                     <div className="w-px h-5 bg-gray-200" />
                     <ViewSelector
+                        objectId={objectId}
                         objectName={objectName}
                         currentView={currentView}
                         views={savedViews}

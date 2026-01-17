@@ -2,11 +2,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Search, Briefcase, Users, CheckSquare, ArrowRight, Command } from 'lucide-react';
 import { ViewState, Company, Activity, Person } from '../types';
+import CompanyAvatar from './CompanyAvatar';
 
 interface CommandPaletteProps {
    isOpen: boolean;
    onClose: () => void;
-   onNavigate: (view: ViewState) => void;
+   onNavigate: (view: ViewState, recordId?: string) => void;
    companies: Company[];
    activities: Activity[];
    people: Person[];
@@ -63,11 +64,11 @@ const CommandPalette: React.FC<CommandPaletteProps> = ({
    const handleSelect = (item: ResultItem | undefined) => {
       if (!item) return;
       if (item.kind === 'company') {
-         onNavigate('companies');
+         onNavigate('companies', item.entity.id);
       } else if (item.kind === 'person') {
-         onNavigate('people');
+         onNavigate('people', item.entity.id);
       } else {
-         onNavigate('tasks');
+         onNavigate('tasks', item.entity.id);
       }
       onClose();
    };
@@ -136,7 +137,7 @@ const CommandPalette: React.FC<CommandPaletteProps> = ({
                            className={`flex items-center justify-between px-3 py-2 rounded-md cursor-pointer group ${resultItems[selectedIndex] && resultItems[selectedIndex].kind === 'company' && resultItems[selectedIndex].entity.id === company.id ? 'bg-blue-50' : 'hover:bg-gray-100'}`}
                         >
                            <div className="flex items-center gap-3">
-                              <img src={company.logo} className="w-5 h-5 rounded-sm" alt="" />
+                              <CompanyAvatar name={company.name} size="sm" />
                               <span className="text-sm font-medium text-gray-800">{company.name}</span>
                            </div>
                            <span className="text-xs text-gray-400 group-hover:text-gray-600">Open</span>
@@ -155,11 +156,13 @@ const CommandPalette: React.FC<CommandPaletteProps> = ({
                            className={`flex items-center justify-between px-3 py-2 rounded-md cursor-pointer group ${resultItems[selectedIndex] && resultItems[selectedIndex].kind === 'person' && resultItems[selectedIndex].entity.id === person.id ? 'bg-blue-50' : 'hover:bg-gray-100'}`}
                         >
                            <div className="flex items-center gap-3">
-                              <img src={person.avatar} className="w-5 h-5 rounded-full" alt="" />
+                              <div className="w-5 h-5 rounded-full bg-gray-100 flex items-center justify-center font-bold text-[9px] text-gray-500 border border-gray-200 select-none">
+                                 {person.name ? person.name.split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase() : '??'}
+                              </div>
                               <span className="text-sm font-medium text-gray-800">{person.name}</span>
                               <span className="text-xs text-gray-400 ml-1">{person.role}</span>
                            </div>
-                           <span className="text-xs text-gray-400 group-hover:text-gray-600">View</span>
+                           <span className="text-xs text-gray-400 group-hover:text-gray-600">Open</span>
                         </div>
                      ))}
                   </div>

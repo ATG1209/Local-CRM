@@ -1,56 +1,9 @@
 import React from 'react';
-import { Company, Activity, Person } from '../types';
+import { Company, Activity, Person, ColumnDefinition } from '../types';
 import GenericObjectView from './GenericObjectView';
 import CompanyDetailPanel from './CompanyDetailPanel';
-import { computeCompanyAlert, AlertSeverity, AlertSegment } from '../utils/alertHelper';
-import {
-   Calendar,
-   CalendarX,
-   ListX,
-   CheckSquare,
-   AlertCircle,
-   CheckCircle,
-   Disc,
-   History,
-   CalendarClock
-} from 'lucide-react';
-
-const AlertIcon = ({ name, className }: { name: string, className?: string }) => {
-   const size = 14;
-   switch (name) {
-      case 'CalendarX': return <CalendarX size={size} className={className} />;
-      case 'Calendar': return <Calendar size={size} className={className} />;
-      case 'CalendarClock': return <CalendarClock size={size} className={className} />;
-      case 'ListX': return <ListX size={size} className={className} />;
-      case 'Exclude': return <ListX size={size} className={className} />; // Fallback
-      case 'CheckSquare': return <CheckSquare size={size} className={className} />;
-      case 'AlertCircle': return <AlertCircle size={size} className={className} />;
-      case 'CheckCircle': return <CheckCircle size={size} className={className} />;
-      case 'Disc': return <Disc size={size} className={className} />;
-      case 'History': return <History size={size} className={className} />;
-      default: return <Calendar size={size} className={className} />;
-   }
-};
-
-const AlertPill: React.FC<{ segment: AlertSegment }> = ({ segment }) => {
-   const severityColors: Record<AlertSeverity, string> = {
-      danger: "bg-red-100 text-red-700 border-red-200",
-      warning: "bg-amber-100 text-amber-700 border-amber-200",
-      info: "bg-blue-100 text-blue-700 border-blue-200",
-      success: "bg-green-100 text-green-700 border-green-200",
-      neutral: "bg-gray-100 text-gray-700 border-gray-200"
-   };
-
-   return (
-      <div
-         className={`flex items-center gap-1.5 px-2 py-0.5 rounded-full border text-[10px] font-medium whitespace-nowrap ${severityColors[segment.severity]}`}
-         title={segment.text}
-      >
-         <AlertIcon name={segment.icon} />
-         <span>{segment.text}</span>
-      </div>
-   );
-};
+import { computeCompanyAlert, AlertSegment, AlertSeverity } from '../utils/companyAlert';
+import * as LucideIcons from 'lucide-react';
 
 interface CompaniesViewProps {
    companies: Company[];
@@ -59,10 +12,130 @@ interface CompaniesViewProps {
    onAddCompany: (company: Company) => void;
    onUpdateCompany: (company: Company) => void;
    onDeleteCompany: (id: string) => void;
+   onUpdateActivity: (activity: Activity) => void;
+   onDeleteActivity: (id: string) => void;
+   onUpdatePerson: (person: Person) => void;
+   onDeletePerson: (id: string) => void;
    initialViewId?: string;
    onViewFavoriteChange?: () => void;
-   onLogTouch?: (companyId: string) => void;
+   initialRecordId?: string;
 }
+
+const AlertPill: React.FC<{ segment: AlertSegment }> = ({ segment }) => {
+   const Icon = (LucideIcons as any)[segment.icon] || (LucideIcons as any)[segment.icon.replace('Circle', 'Circle2')] || LucideIcons.HelpCircle;
+
+   const severityStyles: Record<AlertSeverity, string> = {
+      danger: 'bg-red-50 text-red-700 border-red-100',
+      warning: 'bg-amber-50 text-amber-700 border-amber-100',
+      success: 'bg-emerald-50 text-emerald-700 border-emerald-100',
+      neutral: 'bg-gray-50 text-gray-700 border-gray-100',
+      info: 'bg-blue-50 text-blue-800 border-blue-100'
+   };
+
+   return (
+      <div className={`inline-flex items-center gap-2 px-2.5 py-1 rounded-md text-[11px] font-bold border transition-colors ${severityStyles[segment.severity]}`}>
+         <Icon size={14} strokeWidth={2.5} className="opacity-90" />
+         <span className="leading-none">{segment.text}</span>
+      </div>
+   );
+};
+
+import { formatDistanceToNow, differenceInCalendarDays } from 'date-fns';
+import { RefreshCcw, Calendar as CalendarIcon } from 'lucide-react';
+import DatePickerPopover from './DatePickerPopover';
+
+const LogTouchCell = ({
+   record,
+   col,
+   onUpdate
+}: {
+   record: any;
+   col: ColumnDefinition;
+   onUpdate: (r: any) => void;
+}) => {
+   const [isPickerOpen, setIsPickerOpen] = React.useState(false);
+   const triggerRef = React.useRef<HTMLButtonElement>(null);
+
+   const value = record[col.accessorKey];
+   let loggedDate = value ? new Date(value) : null;
+
+   // Validate date
+   if (loggedDate && isNaN(loggedDate.getTime())) {
+      loggedDate = null;
+   }
+
+   // Logic: Incremental time with urgency colors
+   let statusText = 'Never logged';
+   let colorClass = 'text-gray-400 italic'; // Default for null/never
+
+   if (loggedDate) {
+      const daysSince = differenceInCalendarDays(new Date(), loggedDate);
+
+      if (daysSince === 0) {
+         statusText = 'Today';
+      } else if (daysSince === 1) {
+         statusText = 'Yesterday';
+      } else {
+         statusText = `${daysSince} days ago`;
+      }
+
+      if (daysSince >= 14) {
+         colorClass = 'text-red-600 font-medium'; // Overdue
+      } else if (daysSince >= 10) {
+         colorClass = 'text-yellow-600 font-medium'; // Warning
+      } else {
+         colorClass = 'text-gray-700'; // Fine
+      }
+   }
+
+   return (
+      <div className="flex items-center gap-2 w-full h-full px-3 group">
+         {/* Quick Log Button - Always visible */}
+         <button
+            type="button"
+            onClick={(e) => {
+               e.stopPropagation();
+               onUpdate({ ...record, [col.accessorKey]: Date.now() });
+            }}
+            className="p-1 rounded bg-blue-50 text-blue-600 hover:bg-blue-100 hover:text-blue-700 transition-colors"
+            title="Log touch now"
+         >
+            <RefreshCcw size={12} />
+         </button>
+
+         <div className="flex-1 flex items-center justify-between min-w-0">
+            <span
+               className={`text-sm truncate cursor-pointer hover:underline ${colorClass}`}
+               onClick={(e) => { e.stopPropagation(); setIsPickerOpen(true); }}
+               title={loggedDate ? loggedDate.toLocaleDateString() : 'No date set'}
+            >
+               {statusText}
+            </span>
+
+            {/* Calendar Icon */}
+            <button
+               ref={triggerRef}
+               onClick={(e) => { e.stopPropagation(); setIsPickerOpen(true); }}
+               className="p-1 text-gray-400 hover:text-gray-600 opacity-0 group-hover:opacity-100 transition-opacity"
+            >
+               <CalendarIcon size={12} />
+            </button>
+         </div>
+
+         <DatePickerPopover
+            isOpen={isPickerOpen}
+            onClose={() => setIsPickerOpen(false)}
+            date={loggedDate}
+            onChange={(date) => {
+               if (date) {
+                  onUpdate({ ...record, [col.accessorKey]: date.getTime() });
+               }
+            }}
+            triggerRef={triggerRef}
+         />
+      </div>
+   );
+};
 
 const CompaniesView: React.FC<CompaniesViewProps> = ({
    companies,
@@ -71,71 +144,95 @@ const CompaniesView: React.FC<CompaniesViewProps> = ({
    onAddCompany,
    onUpdateCompany,
    onDeleteCompany,
+   onUpdateActivity,
+   onDeleteActivity,
+   onUpdatePerson,
+   onDeletePerson,
    initialViewId,
    onViewFavoriteChange,
-   onLogTouch
+   initialRecordId
 }) => {
-   const renderAlerts = (company: Company) => {
-      if (!company) return null;
-      const alert = computeCompanyAlert(company, activities);
-      return (
-         <div className="flex items-center gap-2 flex-wrap">
-            {alert.segments.map((seg, i) => (
-               <AlertPill key={i} segment={seg} />
-            ))}
-         </div>
-      );
+   // Define the alert column
+   const alertColumn: ColumnDefinition = {
+      id: 'computed_alerts',
+      label: 'Health & Coverage',
+      type: 'text',
+      accessorKey: 'computed_alerts',
+      visible: true,
+      isSystem: true,
+      readonly: true,
+      width: 320
    };
 
-   // Inject "Alert" column if not present? 
-   // Actually GenericObjectView expects columns. We can override or let it assume attributes.
-   // But Alert is computed. We need to pass a custom column definition or rely on "renderCustomCell" to hijack a specific column ID.
-   // Let's assume we want to show it as a specific column.
-   // We can use a "virtual" column definition.
+   // Enrich companies with computed alerts
+   const companiesWithAlerts = React.useMemo(() => {
+      return companies.map(company => ({
+         ...company,
+         computed_alerts: computeCompanyAlert(company, activities)
+      }));
+   }, [companies, activities]);
 
+   const renderCustomCell = (record: any, col: ColumnDefinition) => {
+      if (col.id === 'computed_alerts') {
+         const segments = record.computed_alerts as AlertSegment[];
+         return (
+            <div className="flex flex-nowrap gap-1.5 px-3 py-1 overflow-x-auto">
+               {segments.map((segment, idx) => (
+                  <AlertPill key={idx} segment={segment} />
+               ))}
+            </div>
+         );
+      }
 
+      // Log Touch Control for Table View
+      const isLogTouchField = col.accessorKey === 'lastLoggedAt' ||
+         col.id === 'lastLoggedAt' ||
+         (col.label && col.label.toLowerCase().includes('last logged'));
+
+      if (isLogTouchField) {
+         return (
+            <LogTouchCell
+               record={record}
+               col={col}
+               onUpdate={onUpdateCompany}
+            />
+         );
+      }
+
+      return null;
+   };
 
    return (
       <GenericObjectView
          objectId="obj_companies"
          objectName="Company"
-         data={companies}
+         data={companiesWithAlerts}
          people={people}
          onAddRecord={onAddCompany}
          onUpdateRecord={onUpdateCompany}
          onDeleteRecord={onDeleteCompany}
          initialViewId={initialViewId}
+         initialRecordId={initialRecordId}
          onViewFavoriteChange={onViewFavoriteChange}
-         columns={[{
-            id: 'alert',
-            label: 'Alert',
-            type: 'text', // Use 'text' type but we hijack rendering
-            accessorKey: 'alert',
-            visible: true,
-            width: 300,
-            readonly: true,
-            isSystem: true
-         }]}
-         renderCustomCell={(record, col) => {
-            if (col.id === 'alert') {
-               return renderAlerts(record as Company);
-            }
-            return null;
-         }}
+         columns={[alertColumn]} // Pass custom columns to be merged
+         renderCustomCell={renderCustomCell}
          DetailPanelRequest={({ isOpen, onClose, data, onUpdate, columns, people, onEditAttribute, onAddProperty, onToggleVisibility }) => (
             <CompanyDetailPanel
                isOpen={isOpen}
                onClose={onClose}
                company={data}
                onUpdate={onUpdate}
+               companies={companies}
                people={people || []}
                activities={activities}
                columns={columns}
                onEditAttribute={onEditAttribute}
                onAddProperty={onAddProperty}
                onToggleVisibility={onToggleVisibility}
-               onLogTouch={onLogTouch}
-               computedAlert={computeCompanyAlert(data, activities)}
+               onUpdateActivity={onUpdateActivity}
+               onDeleteActivity={onDeleteActivity}
+               onUpdatePerson={onUpdatePerson}
+               onDeletePerson={onDeletePerson}
             />
          )}
       />

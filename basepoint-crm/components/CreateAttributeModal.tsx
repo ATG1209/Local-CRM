@@ -21,13 +21,15 @@ import {
    Zap
 } from 'lucide-react';
 import { ColumnType, AttributeOption } from '../types';
-import { fetchObjects, ObjectType } from '../utils/schemaApi';
+import { fetchObjects, ObjectType, Attribute } from '../utils/schemaApi';
+import { isProtectedColumn } from '../utils/attributeHelpers';
 
 interface CreateAttributeModalProps {
    isOpen: boolean;
    onClose: () => void;
    onSave: (data: any) => void; // partial Attribute data
    initialData?: any | null; // Attribute or ColumnDefinition
+   onDelete?: (id: string) => void; // Delete attribute callback
 }
 
 const ATTRIBUTE_TYPES: { type: ColumnType; label: string; icon: React.ReactNode }[] = [
@@ -62,7 +64,7 @@ const COLOR_OPTIONS = [
    { name: 'Red', value: 'bg-red-100 text-red-700', border: 'border-red-200' },
 ];
 
-const CreateAttributeModal: React.FC<CreateAttributeModalProps> = ({ isOpen, onClose, onSave, initialData }) => {
+const CreateAttributeModal: React.FC<CreateAttributeModalProps> = ({ isOpen, onClose, onSave, initialData, onDelete }) => {
    const [name, setName] = useState('');
    const [selectedType, setSelectedType] = useState<ColumnType | null>(null);
    const [description, setDescription] = useState('');
@@ -130,6 +132,17 @@ const CreateAttributeModal: React.FC<CreateAttributeModalProps> = ({ isOpen, onC
          onSave(attributeData);
          onClose();
       }
+   };
+
+   const handleDelete = () => {
+      if (!initialData?.id) return;
+
+      // Check if column is protected
+      const accessorKey = initialData.accessorKey || initialData.id;
+      if (isProtectedColumn(accessorKey) || isProtectedColumn(initialData.id)) return;
+
+      onDelete?.(initialData.id);
+      onClose();
    };
 
    const handleAddOption = () => {
@@ -328,17 +341,29 @@ const CreateAttributeModal: React.FC<CreateAttributeModalProps> = ({ isOpen, onC
                </div>
             </div>
 
-            <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex justify-end gap-3">
-               <button onClick={onClose} className="px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-200 rounded-md transition-colors">
-                  Cancel
-               </button>
-               <button
-                  onClick={handleSubmit}
-                  disabled={!name || !selectedType || (selectedType === 'relation' && !targetObjectId)}
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-md shadow-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-               >
-                  {initialData ? 'Save changes' : 'Create attribute'}
-               </button>
+            <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex justify-between items-center gap-3">
+               {initialData && onDelete && !isProtectedColumn(initialData.accessorKey || initialData.id) && !isProtectedColumn(initialData.id) ? (
+                  <button
+                     onClick={handleDelete}
+                     className="px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 rounded-md transition-colors border border-red-200"
+                  >
+                     Delete
+                  </button>
+               ) : (
+                  <div />
+               )}
+               <div className="flex gap-3">
+                  <button onClick={onClose} className="px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-200 rounded-md transition-colors">
+                     Cancel
+                  </button>
+                  <button
+                     onClick={handleSubmit}
+                     disabled={!name || !selectedType || (selectedType === 'relation' && !targetObjectId)}
+                     className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-md shadow-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                     {initialData ? 'Save changes' : 'Create attribute'}
+                  </button>
+               </div>
             </div>
 
          </div>

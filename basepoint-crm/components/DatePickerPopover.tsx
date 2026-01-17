@@ -1,5 +1,5 @@
-
 import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import {
     Calendar,
     ChevronLeft,
@@ -38,36 +38,73 @@ const DatePickerPopover: React.FC<DatePickerPopoverProps> = ({
     const [pickerView, setPickerView] = useState<PickerView>('calendar');
     const [currentMonth, setCurrentMonth] = useState(new Date());
     const [dateInputVal, setDateInputVal] = useState('');
-    const [position, setPosition] = useState<'top' | 'bottom'>('bottom');
     const [internalDate, setInternalDate] = useState<Date | null>(date);
     const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
     const containerRef = useRef<HTMLDivElement>(null);
+    const [coords, setCoords] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
+    const [transformOriginStyle, setTransformOriginStyle] = useState<string>('top center');
 
     const isDirty = (internalDate?.getTime() !== date?.getTime());
 
     useEffect(() => {
-        if (isOpen) {
+        if (isOpen && triggerRef.current) {
             setPickerView('calendar');
             setDateInputVal('');
             setInternalDate(date);
             setShowDiscardConfirm(false);
-            // Smart positioning
-            if (forcedPosition) {
-                setPosition(forcedPosition);
-            } else if (triggerRef.current) {
-                const rect = triggerRef.current.getBoundingClientRect();
-                const spaceBelow = window.innerHeight - rect.bottom;
-                const PICKER_HEIGHT = 400; // Increased for footer
-                if (spaceBelow < PICKER_HEIGHT && rect.top > PICKER_HEIGHT) {
-                    setPosition('top');
-                } else {
-                    setPosition('bottom');
+
+            // Calculate fixed position
+            const rect = triggerRef.current.getBoundingClientRect();
+            const PICKER_HEIGHT = 420;
+            const PICKER_WIDTH = 280;
+            const PADDING = 10; // Margin from edges
+
+            const spaceBelow = window.innerHeight - rect.bottom;
+            const spaceAbove = rect.top;
+
+            let top, left;
+            let origin: 'top' | 'bottom' = 'top'; // for animation transform-origin
+
+            // Vertical Positioning
+            // Prefer bottom if it fits, or if it fits better than top
+            if (spaceBelow >= PICKER_HEIGHT || spaceBelow > spaceAbove) {
+                // Go Bottom
+                top = rect.bottom + 8;
+                // Clamp if overflowing bottom
+                if (top + PICKER_HEIGHT > window.innerHeight - PADDING) {
+                    // It doesn't fit fully, but it's the best option.
+                    // We can shift it up slightly? No, that covers the trigger.
+                    // We relies on maxHeight later.
                 }
+                origin = 'top';
             } else {
-                setPosition('bottom');
+                // Go Top
+                top = rect.top - PICKER_HEIGHT - 8;
+                // If top is negative (clips top), shift down?
+                if (top < PADDING) {
+                    // If it really doesn't fit top, and we are here, it means spaceAbove > spaceBelow.
+                    // We clamp to PADDING.
+                    top = PADDING;
+                }
+                origin = 'bottom';
             }
+
+            // Horizontal Positioning
+            if (align === 'right') {
+                left = rect.right - PICKER_WIDTH;
+            } else {
+                left = rect.left;
+            }
+
+            // Boundary checks (Horizontal)
+            if (left < PADDING) left = PADDING;
+            if (left + PICKER_WIDTH > window.innerWidth - PADDING) left = window.innerWidth - PICKER_WIDTH - PADDING;
+
+            setCoords({ top, left });
+            setTransformOriginStyle(`${origin} center`);
+            // We could also set max-height state if needed, but CSS is easier
         }
-    }, [isOpen, triggerRef, date]);
+    }, [isOpen, triggerRef, date, align, forcedPosition]);
 
     const handleCloseAttempt = () => {
         if (isDirty) {
@@ -107,7 +144,7 @@ const DatePickerPopover: React.FC<DatePickerPopoverProps> = ({
             document.removeEventListener('mousedown', handleClickOutside);
             document.removeEventListener('keydown', handleKeyDown);
         };
-    }, [isOpen, onClose, triggerRef, isDirty]);
+    }, [isOpen, onClose, triggerRef, isDirty, showDiscardConfirm]);
 
     const handleDateInput = (e: React.ChangeEvent<HTMLInputElement>) => {
         setDateInputVal(e.target.value);
@@ -200,13 +237,15 @@ const DatePickerPopover: React.FC<DatePickerPopoverProps> = ({
 
     if (!isOpen) return null;
 
-    return (
+    return createPortal(
         <div
             ref={containerRef}
-            className={`absolute z-[100] w-[280px] bg-white rounded-xl shadow-2xl border border-gray-200 overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-100 ring-1 ring-black/5 ${align === 'right' ? 'right-0' : 'left-0'}`}
+            className="fixed z-[9999] w-[280px] bg-white rounded-xl shadow-2xl border border-gray-200 overflow-hidden flex flex-col ring-1 ring-black/5"
             style={{
-                top: position === 'bottom' ? 'calc(100% + 8px)' : 'auto',
-                bottom: position === 'top' ? 'calc(100% + 8px)' : 'auto'
+                top: coords.top,
+                left: coords.left,
+                maxHeight: 'calc(100vh - 20px)', // Ensure it never exceeds viewport height
+                transformOrigin: transformOriginStyle // or dynamic based on position
             }}
         >
             {/* Top Input */}
@@ -393,7 +432,8 @@ const DatePickerPopover: React.FC<DatePickerPopoverProps> = ({
                     </div>
                 </div>
             )}
-        </div>
+        </div>,
+        document.body
     );
 };
 

@@ -12,19 +12,23 @@ interface Option {
 interface RelationPickerProps {
     value: string | string[] | null | undefined;
     onChange: (value: string[]) => void;
+    onItemClick?: (id: string) => void;
     options: Option[];
     placeholder?: string;
     emptyMessage?: string;
     type?: 'person' | 'company';
+    className?: string;
 }
 
 const RelationPicker: React.FC<RelationPickerProps> = ({
     value,
     onChange,
+    onItemClick,
     options,
     placeholder = "Select...",
     emptyMessage = "Select as many as you like",
-    type = 'person'
+    type = 'person',
+    className = ""
 }) => {
     const [isOpen, setIsOpen] = useState(false);
     const [search, setSearch] = useState("");
@@ -87,6 +91,15 @@ const RelationPicker: React.FC<RelationPickerProps> = ({
         onChange(selectedIds.filter(id => id !== optionId));
     };
 
+    const handleItemClick = (optionId: string, e: React.MouseEvent) => {
+        if (onItemClick) {
+            e.stopPropagation();
+            onItemClick(optionId);
+        } else {
+            setIsOpen(true);
+        }
+    };
+
     const renderAvatar = (option: Option) => {
         if (option.icon) return <div className="flex-shrink-0">{option.icon}</div>;
         if (type === 'company') {
@@ -100,17 +113,18 @@ const RelationPicker: React.FC<RelationPickerProps> = ({
     };
 
     return (
-        <div className="relative w-full h-full" ref={containerRef}>
+        <div className={`relative w-full h-full ${className}`} ref={containerRef}>
             {/* Trigger - shows chips or placeholder */}
             <div
-                className="w-full h-full px-2 flex items-center gap-1 overflow-hidden cursor-pointer hover:bg-gray-50"
+                className="w-full h-full flex items-center gap-1 overflow-hidden cursor-pointer hover:bg-gray-50"
                 onClick={() => setIsOpen(true)}
             >
                 {selectedOptions.length > 0 ? (
                     selectedOptions.map(opt => (
                         <div
                             key={opt.id}
-                            className="flex-shrink-0 flex items-center gap-1 px-1.5 py-0.5 bg-gray-100 rounded text-xs text-gray-700"
+                            className={`flex-shrink-0 flex items-center gap-1 px-1.5 py-0.5 bg-gray-100 rounded text-xs text-gray-700 ${onItemClick ? 'hover:bg-gray-200 hover:text-blue-700 transition-colors' : ''}`}
+                            onClick={(e) => handleItemClick(opt.id, e)}
                         >
                             {renderAvatar(opt)}
                             <span className="truncate max-w-[60px]">{opt.label}</span>

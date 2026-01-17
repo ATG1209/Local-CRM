@@ -12,6 +12,19 @@ dist
 dist-ssr
 *.local
 
+# Database files - CRITICAL: Never commit the database!
+*.db
+*.db-shm
+*.db-wal
+server/crm.db
+server/*.db
+backups/
+
+# Environment files
+.env
+.env.local
+.env.production
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

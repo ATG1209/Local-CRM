@@ -30,7 +30,6 @@ import {
   MapPin,
   Phone,
   Grid2X2,
-  Mail,
   Linkedin,
   Plus
 } from 'lucide-react';
@@ -99,14 +98,23 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
     }
   }, [task]);
 
+  // Handle Escape key to close the panel and stop propagation
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && isOpen) {
+        e.stopPropagation();
+        e.preventDefault();
         onClose();
       }
     };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+
+    if (isOpen) {
+      window.addEventListener('keydown', handleKeyDown, true); // Use capture phase to intercept before parent
+    }
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown, true);
+    };
   }, [isOpen, onClose]);
 
   const updateField = (field: keyof Task, value: any) => {
@@ -196,8 +204,8 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
                     c.id !== 'description' &&
                     c.id !== 'isCompleted'
                   ).map(col => (
-                    <div key={col.id} className="group grid grid-cols-[140px_1fr_auto] items-start gap-2 py-1 min-h-[32px] hover:bg-gray-50 rounded px-1 -mx-1">
-                      <div className="flex items-center gap-2 text-sm text-gray-500 mt-1.5 overflow-hidden">
+                    <div key={col.id} className="group grid grid-cols-[140px_1fr_auto] items-start gap-3 py-1 min-h-[32px] hover:bg-gray-50 rounded px-1 -mx-1">
+                      <div className="flex items-center gap-2 text-sm text-gray-500 min-h-[32px] overflow-hidden">
                         <div className="p-1 rounded bg-gray-100 text-gray-500 flex-shrink-0">
                           <TypeIcon type={col.type} />
                         </div>
@@ -215,7 +223,7 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
                               <div className="relative w-full" ref={dateTriggerRef}>
                                 <div
                                   onClick={() => setIsDatePickerOpen(!isDatePickerOpen)}
-                                  className="flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer hover:bg-gray-100 border border-transparent hover:border-gray-200 -ml-2 text-sm text-gray-900"
+                                  className="flex items-center gap-2 px-0 py-1.5 rounded cursor-pointer hover:bg-gray-100 border border-transparent hover:border-gray-200 text-sm text-gray-900 min-h-[32px]"
                                 >
                                   {value ? (
                                     <>
@@ -245,12 +253,12 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
 
                           if (col.type === 'person' || col.accessorKey === 'assignedTo') {
                             return (
-                              <div className="h-8">
+                              <div className="h-8 flex items-center">
                                 <SearchableSelect
                                   value={value}
                                   onChange={(val) => updateField(col.accessorKey as keyof Task, val)}
                                   options={userOptions}
-                                  className="border-transparent bg-transparent hover:bg-gray-50 -ml-2"
+                                  className="border-transparent bg-transparent hover:bg-gray-50"
                                 />
                               </div>
                             );
@@ -258,7 +266,7 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
 
                           if (col.type === 'relation' || col.accessorKey === 'linkedCompanyId') {
                             return (
-                              <div className="h-8">
+                              <div className="h-8 flex items-center">
                                 <RelationPicker
                                   value={value}
                                   onChange={(newIds) => updateField(col.accessorKey as keyof Task, newIds[0] || null)}
@@ -273,7 +281,6 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
                           if (col.accessorKey === 'type') {
                             const iconMap = {
                               CheckSquare: CheckSquare,
-                              Mail: Mail,
                               Phone: Phone,
                               Calendar: Calendar
                             };
@@ -288,12 +295,12 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
                             });
 
                             return (
-                              <div className="h-8">
+                              <div className="h-8 flex items-center">
                                 <SearchableSelect
                                   value={value}
                                   onChange={(val) => updateField(col.accessorKey as keyof Task, val)}
                                   options={typeOptions}
-                                  className="border-transparent bg-transparent hover:bg-gray-50 -ml-2"
+                                  className="border-transparent bg-transparent hover:bg-gray-50"
                                 />
                               </div>
                             );
@@ -302,7 +309,7 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
                           // Default rendering for other generic properties
                           return (
                             <input
-                              className="w-full text-sm px-2 py-1.5 border border-transparent hover:border-gray-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 bg-transparent rounded transition-all outline-none"
+                              className="w-full text-sm px-0 py-1.5 border border-transparent hover:border-gray-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 bg-transparent rounded transition-all outline-none"
                               value={value || ''}
                               onChange={(e) => updateField(col.accessorKey as keyof Task, e.target.value)}
                               placeholder="Empty"
@@ -312,7 +319,7 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
                       </div>
 
                       {/* Action buttons */}
-                      <div className="flex items-center gap-0.5 mt-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <div className="flex items-center gap-0.5 min-h-[32px] opacity-0 group-hover:opacity-100 transition-opacity">
                         <div
                           className="cursor-pointer p-1 text-gray-300 hover:text-gray-600 hover:bg-gray-100 rounded"
                           onClick={(e) => { e.stopPropagation(); onEditAttribute(col); }}

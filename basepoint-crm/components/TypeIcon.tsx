@@ -4,7 +4,7 @@ import {
     Type,
     Calendar,
     Hash,
-    CheckSquare,
+    CheckCircle,
     Star,
     Clock,
     List,
@@ -45,7 +45,7 @@ const TypeIcon: React.FC<TypeIconProps> = ({ type, size = 12, className = "text-
         case 'number':
             return <Hash {...iconProps} />;
         case 'checkbox':
-            return <CheckSquare {...iconProps} />;
+            return <CheckCircle {...iconProps} />;
         case 'rating':
             return <Star {...iconProps} />;
         case 'timestamp':

@@ -36,7 +36,6 @@ export interface Company {
   sensitiveVertical: boolean;
   quarters: string; // Select
   nal: boolean; // True/False
-  lastLoggedAt?: string | null; // ISO String for Log Touch
   createdAt: string; // ISO String
 }
 
@@ -93,21 +92,9 @@ export interface WorkflowRun {
   credits: number;
 }
 
-export interface Task {
-  id: string;
-  title: string;
-  isCompleted: boolean;
-  dueDate: Date | null;
-  linkedCompanyId?: string;
-  assignedTo: string; // "You" or user ID
-  createdBy: string; // "You" or user ID
-  createdAt: Date;
-  description?: string;
-}
-
 // --- Activity System (Unified task/email/call/meeting) ---
 
-export type ActivityType = 'task' | 'email' | 'call' | 'meeting';
+export type ActivityType = 'task' | 'call' | 'meeting';
 
 export interface Activity {
   id: string;
@@ -141,12 +128,7 @@ export const ACTIVITY_TYPE_CONFIGS: Record<ActivityType, ActivityTypeConfig> = {
     icon: 'CheckSquare',
     color: 'blue'
   },
-  email: {
-    type: 'email',
-    label: 'Email',
-    icon: 'Mail',
-    color: 'purple'
-  },
+
   call: {
     type: 'call',
     label: 'Call',
@@ -158,7 +140,7 @@ export const ACTIVITY_TYPE_CONFIGS: Record<ActivityType, ActivityTypeConfig> = {
     type: 'meeting',
     label: 'Meeting',
     icon: 'Calendar',
-    color: 'amber',
+    color: 'purple',
     defaultDuration: 60
   }
 };
@@ -245,12 +227,19 @@ export interface KanbanConfig {
   showColumnSums?: string;        // attribute ID for sum (e.g., 'value')
 }
 
+// Column preferences stored in views (subset of ColumnDefinition for persistence)
+export interface ColumnPreference {
+  id: string;
+  visible: boolean;
+  width?: number;
+}
+
 export interface SavedView {
   id: string;
   name: string;
   objectId: string;               // Link view to specific object/database
   type: 'table' | 'kanban';
-  columns: ColumnDefinition[];
+  columns: ColumnPreference[];    // Only stores preferences, full definitions come from schema
   sort?: SortRule[];
   filters?: FilterRule[];
   kanbanConfig?: KanbanConfig;    // Kanban-specific settings
@@ -263,6 +252,8 @@ export interface SavedView {
 export interface ObjectType {
   id: string;
   name: string;
+  singularName?: string;
+  description?: string;
   slug: string;
   icon: string;
   isSystem: boolean;
@@ -297,3 +288,13 @@ export interface RecordRelation {
   attributeId: string;
   createdAt?: string;
 }
+
+export const ACTIVITY_COLUMNS: ColumnDefinition[] = [
+  { id: 'type', label: 'Type', type: 'select', accessorKey: 'type', visible: true, width: 120 },
+  { id: 'isCompleted', label: 'Done', type: 'checkbox', accessorKey: 'isCompleted', visible: true, width: 40 },
+  { id: 'title', label: 'Activity', type: 'text', accessorKey: 'title', visible: true, isSystem: true, width: 300 },
+  { id: 'due', label: 'Due Date', type: 'date', accessorKey: 'dueDate', visible: true, width: 160 },
+  { id: 'company', label: 'Company', type: 'relation', accessorKey: 'linkedCompanyId', visible: true, width: 200 },
+  { id: 'person', label: 'Person', type: 'relation', accessorKey: 'linkedPersonId', visible: true, width: 200 },
+  { id: 'assignee', label: 'Assignee', type: 'person', accessorKey: 'assignedTo', visible: true, width: 180 },
+];

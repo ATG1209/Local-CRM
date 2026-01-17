@@ -3,6 +3,7 @@ const sqlite3 = require('sqlite3').verbose();
 const cors = require('cors');
 const bodyParser = require('body-parser');
 const path = require('path');
+const { createBackup, listBackups, restoreBackup } = require('./backup');
 require('dotenv').config();
 
 const app = express();
@@ -20,6 +21,14 @@ const db = new sqlite3.Database(DB_PATH, (err) => {
     console.error('Error opening database', err.message);
   } else {
     console.log('Connected to the SQLite database.');
+
+    // Create automatic backup on server start
+    try {
+      createBackup('auto');
+    } catch (backupError) {
+      console.warn('⚠️  Auto-backup failed on startup:', backupError.message);
+    }
+
     initDb();
   }
 });
@@ -637,8 +646,14 @@ function initDb() {
 }
 
 // Routes
+// Whitelist of allowed tables for CRUD operations
+const ALLOWED_TABLES = new Set(['companies', 'people', 'tasks', 'activities', 'deals', 'objects', 'attributes', 'record_relations']);
+
 // Generic CRUD handlers
 const handleGet = (table) => (req, res) => {
+  if (!ALLOWED_TABLES.has(table)) {
+    return res.status(400).json({ error: 'Invalid table name' });
+  }
   db.all(`SELECT * FROM ${table}`, [], (err, rows) => {
     if (err) return res.status(500).json({ error: err.message });
     // Parse JSON fields if necessary
@@ -665,6 +680,9 @@ const handleGet = (table) => (req, res) => {
 };
 
 const handleCreate = (table) => (req, res) => {
+  if (!ALLOWED_TABLES.has(table)) {
+    return res.status(400).json({ error: 'Invalid table name' });
+  }
   const data = req.body;
   // Always stamp creation date
   if (!data.createdAt) {
@@ -686,6 +704,9 @@ const handleCreate = (table) => (req, res) => {
 };
 
 const handleUpdate = (table) => (req, res) => {
+  if (!ALLOWED_TABLES.has(table)) {
+    return res.status(400).json({ error: 'Invalid table name' });
+  }
   const { id } = req.params;
   const data = req.body;
   const updates = Object.keys(data).map(key => `${key} = ?`).join(',');
@@ -703,6 +724,9 @@ const handleUpdate = (table) => (req, res) => {
 };
 
 const handleDelete = (table) => (req, res) => {
+  if (!ALLOWED_TABLES.has(table)) {
+    return res.status(400).json({ error: 'Invalid table name' });
+  }
   const { id } = req.params;
   db.run(`DELETE FROM ${table} WHERE id = ?`, id, function (err) {
     if (err) return res.status(500).json({ error: err.message });
@@ -1013,6 +1037,51 @@ app.delete('/api/relations/:id', (req, res) => {
     if (err) return res.status(500).json({ error: err.message });
     res.json({ message: 'Deleted', changes: this.changes });
   });
+});
+
+// ==================== BACKUP & RESTORE ENDPOINTS ====================
+
+// Create manual backup
+app.post('/api/backup', (req, res) => {
+  try {
+    const backupPath = createBackup('manual');
+    res.json({
+      success: true,
+      message: 'Backup created successfully',
+      path: backupPath
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// List all backups
+app.get('/api/backups', (req, res) => {
+  try {
+    const backups = listBackups();
+    res.json(backups);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Restore from backup
+app.post('/api/restore', (req, res) => {
+  const { backupFile } = req.body;
+
+  if (!backupFile) {
+    return res.status(400).json({ error: 'backupFile is required' });
+  }
+
+  try {
+    restoreBackup(backupFile);
+    res.json({
+      success: true,
+      message: 'Database restored successfully. Please restart the server.'
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
 });
 
 app.listen(PORT, () => {

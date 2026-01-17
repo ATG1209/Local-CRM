@@ -15,12 +15,12 @@ export const MOCK_USERS: User[] = [
 ];
 
 export const MOCK_PEOPLE: Person[] = [
-  { 
-    id: 'p1', 
-    name: 'Guillermo Rauch', 
-    email: 'guillermo@vercel.com', 
-    avatar: 'https://picsum.photos/32/32?random=100', 
-    companyId: '1', 
+  {
+    id: 'p1',
+    name: 'Guillermo Rauch',
+    email: 'guillermo@vercel.com',
+    avatar: 'https://picsum.photos/32/32?random=100',
+    companyId: '1',
     role: 'CEO',
     phone: '+1 555-0101',
     location: 'San Francisco, CA',
@@ -28,12 +28,12 @@ export const MOCK_PEOPLE: Person[] = [
     connectionStrength: 'Strong',
     createdAt: daysAgo(200)
   },
-  { 
-    id: 'p2', 
-    name: 'Nat Friedman', 
-    email: 'nat@github.com', 
-    avatar: 'https://picsum.photos/32/32?random=101', 
-    companyId: '3', 
+  {
+    id: 'p2',
+    name: 'Nat Friedman',
+    email: 'nat@github.com',
+    avatar: 'https://picsum.photos/32/32?random=101',
+    companyId: '3',
     role: 'Advisor',
     phone: '+1 555-0102',
     location: 'San Francisco, CA',
@@ -41,12 +41,12 @@ export const MOCK_PEOPLE: Person[] = [
     connectionStrength: 'Moderate',
     createdAt: daysAgo(180)
   },
-  { 
-    id: 'p3', 
-    name: 'Patrick Collison', 
-    email: 'patrick@stripe.com', 
-    avatar: 'https://picsum.photos/32/32?random=102', 
-    companyId: '4', 
+  {
+    id: 'p3',
+    name: 'Patrick Collison',
+    email: 'patrick@stripe.com',
+    avatar: 'https://picsum.photos/32/32?random=102',
+    companyId: '4',
     role: 'CEO',
     phone: '+1 555-0103',
     location: 'Dublin, Ireland',
@@ -54,24 +54,24 @@ export const MOCK_PEOPLE: Person[] = [
     connectionStrength: 'Strong',
     createdAt: daysAgo(150)
   },
-  { 
-    id: 'p4', 
-    name: 'Dylan Field', 
-    email: 'dylan@figma.com', 
-    avatar: 'https://picsum.photos/32/32?random=103', 
-    companyId: '5', 
+  {
+    id: 'p4',
+    name: 'Dylan Field',
+    email: 'dylan@figma.com',
+    avatar: 'https://picsum.photos/32/32?random=103',
+    companyId: '5',
     role: 'CEO',
     location: 'New York, NY',
     lastInteraction: daysAgo(90),
     connectionStrength: 'Weak',
     createdAt: daysAgo(120)
   },
-  { 
-    id: 'p5', 
-    name: 'Des Traynor', 
-    email: 'des@intercom.com', 
-    avatar: 'https://picsum.photos/32/32?random=104', 
-    companyId: '6', 
+  {
+    id: 'p5',
+    name: 'Des Traynor',
+    email: 'des@intercom.com',
+    avatar: 'https://picsum.photos/32/32?random=104',
+    companyId: '6',
     role: 'Co-founder',
     phone: '+1 555-0105',
     location: 'Dublin, Ireland',
@@ -95,14 +95,14 @@ export const MOCK_PEOPLE: Person[] = [
 ];
 
 export const MOCK_COMPANIES: Company[] = [
-  { 
-    id: '1', 
-    name: 'Vercel', 
-    logo: 'https://picsum.photos/24/24?random=1', 
-    domain: 'vercel.com', 
+  {
+    id: '1',
+    name: 'Vercel',
+    logo: 'https://picsum.photos/24/24?random=1',
+    domain: 'vercel.com',
     links: [{ label: 'LinkedIn', url: '#' }, { label: 'Crunchbase', url: '#' }],
     specialOffers: ['Demand Gen', 'AI Max'],
-    pointOfContactId: 'p1',
+    pointOfContactId: ['p1'],
     notes: 'Key strategic partner for Q3.',
     nextTaskDate: futureDate(5), // Oct 24 approx
     externalId: 'CID-9928',
@@ -113,14 +113,14 @@ export const MOCK_COMPANIES: Company[] = [
     nal: false,
     createdAt: daysAgo(300)
   },
-  { 
-    id: '2', 
-    name: 'DigitalOcean', 
-    logo: 'https://picsum.photos/24/24?random=2', 
-    domain: 'digitalocean.com', 
+  {
+    id: '2',
+    name: 'DigitalOcean',
+    logo: 'https://picsum.photos/24/24?random=2',
+    domain: 'digitalocean.com',
     links: [{ label: 'Website', url: '#' }],
     specialOffers: ['Launch P MAX'],
-    pointOfContactId: null,
+    pointOfContactId: [],
     notes: 'Discussing infrastructure overhaul.',
     nextTaskDate: futureDate(1), // Tomorrow
     externalId: 'CID-1120',
@@ -131,14 +131,14 @@ export const MOCK_COMPANIES: Company[] = [
     nal: true,
     createdAt: daysAgo(280)
   },
-  { 
-    id: '3', 
-    name: 'GitHub', 
-    logo: 'https://picsum.photos/24/24?random=3', 
-    domain: 'github.com', 
+  {
+    id: '3',
+    name: 'GitHub',
+    logo: 'https://picsum.photos/24/24?random=3',
+    domain: 'github.com',
     links: [{ label: 'GitHub', url: '#' }],
     specialOffers: ['NCA', 'ECL'],
-    pointOfContactId: 'p2',
+    pointOfContactId: ['p2'],
     notes: '',
     nextTaskDate: null,
     externalId: 'CID-3321',
@@ -149,14 +149,14 @@ export const MOCK_COMPANIES: Company[] = [
     nal: false,
     createdAt: daysAgo(250)
   },
-  { 
-    id: '4', 
-    name: 'Stripe', 
-    logo: 'https://picsum.photos/24/24?random=4', 
-    domain: 'stripe.com', 
+  {
+    id: '4',
+    name: 'Stripe',
+    logo: 'https://picsum.photos/24/24?random=4',
+    domain: 'stripe.com',
     links: [],
     specialOffers: ['VBB', 'Smart Bid'],
-    pointOfContactId: 'p3',
+    pointOfContactId: ['p3'],
     notes: 'Waiting on legal review.',
     nextTaskDate: futureDate(30), // Nov 01 approx
     externalId: 'CID-5543',
@@ -167,14 +167,14 @@ export const MOCK_COMPANIES: Company[] = [
     nal: false,
     createdAt: daysAgo(220)
   },
-  { 
-    id: '5', 
-    name: 'Figma', 
-    logo: 'https://picsum.photos/24/24?random=5', 
-    domain: 'figma.com', 
+  {
+    id: '5',
+    name: 'Figma',
+    logo: 'https://picsum.photos/24/24?random=5',
+    domain: 'figma.com',
     links: [{ label: 'Design System', url: '#' }],
     specialOffers: ['Gateway'],
-    pointOfContactId: 'p4',
+    pointOfContactId: ['p4'],
     notes: 'Renewal discussion pending.',
     nextTaskDate: futureDate(0), // Today
     externalId: 'CID-8877',
@@ -188,46 +188,50 @@ export const MOCK_COMPANIES: Company[] = [
 ];
 
 export const MOCK_TASKS: Task[] = [
-    {
-      id: '1',
-      title: 'Prepare quarterly review deck',
-      isCompleted: false,
-      dueDate: new Date(new Date().setDate(new Date().getDate() - 6)), // 6 days ago
-      assignedTo: 'you',
-      createdBy: 'you',
-      createdAt: new Date(daysAgo(10)),
-      linkedCompanyId: '1' // Vercel
-    },
-    {
-      id: '2',
-      title: 'Email Patrick regarding API access',
-      isCompleted: false,
-      dueDate: new Date(new Date().setDate(new Date().getDate() - 5)), // 5 days ago
-      assignedTo: 'u1',
-      createdBy: 'you',
-      createdAt: new Date(daysAgo(9)),
-      linkedCompanyId: '4' // Stripe
-    },
-    {
-      id: '3',
-      title: 'Schedule demo with Figma team',
-      isCompleted: false,
-      dueDate: new Date(), // Today
-      assignedTo: 'u2',
-      createdBy: 'u1',
-      createdAt: new Date(daysAgo(5)),
-      linkedCompanyId: '5' // Figma
-    },
-    {
-      id: '4',
-      title: 'Update billing information',
-      isCompleted: true,
-      dueDate: new Date(new Date().setDate(new Date().getDate() - 2)),
-      assignedTo: 'you',
-      createdBy: 'you',
-      createdAt: new Date(daysAgo(4)),
-      linkedCompanyId: '2' // DigitalOcean
-    }
+  {
+    id: '1',
+    type: 'task',
+    title: 'Prepare quarterly review deck',
+    isCompleted: false,
+    dueDate: new Date(new Date().setDate(new Date().getDate() - 6)), // 6 days ago
+    assignedTo: 'you',
+    createdBy: 'you',
+    createdAt: new Date(daysAgo(10)),
+    linkedCompanyId: '1' // Vercel
+  },
+  {
+    id: '2',
+    type: 'task',
+    title: 'Email Patrick regarding API access',
+    isCompleted: false,
+    dueDate: new Date(new Date().setDate(new Date().getDate() - 5)), // 5 days ago
+    assignedTo: 'u1',
+    createdBy: 'you',
+    createdAt: new Date(daysAgo(9)),
+    linkedCompanyId: '4' // Stripe
+  },
+  {
+    id: '3',
+    type: 'task',
+    title: 'Schedule demo with Figma team',
+    isCompleted: false,
+    dueDate: new Date(), // Today
+    assignedTo: 'u2',
+    createdBy: 'u1',
+    createdAt: new Date(daysAgo(5)),
+    linkedCompanyId: '5' // Figma
+  },
+  {
+    id: '4',
+    type: 'task',
+    title: 'Update billing information',
+    isCompleted: true,
+    dueDate: new Date(new Date().setDate(new Date().getDate() - 2)),
+    assignedTo: 'you',
+    createdBy: 'you',
+    createdAt: new Date(daysAgo(4)),
+    linkedCompanyId: '2' // DigitalOcean
+  }
 ];
 
 export const MOCK_DEALS: Deal[] = [

@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Company, Task, ParsedTask } from '../types';
-import { parseTaskInput } from '../utils/taskParser';
+import { Company, Task } from '../types';
+import { parseTaskInput, ParsedTask } from '../utils/taskParser';
 import DatePickerPopover from './DatePickerPopover';
 import SearchableSelect from './SearchableSelect';
 import CompanyAvatar from './CompanyAvatar';
@@ -45,8 +45,6 @@ const QuickTaskModal: React.FC<QuickTaskModalProps> = ({
 
   // Refs
   const titleContainerRef = useRef<HTMLDivElement>(null);
-  const titleInputRef = useRef<HTMLTextAreaElement>(null);
-  const titleOverlayRef = useRef<HTMLDivElement>(null);
   const titleInputRef = useRef<HTMLTextAreaElement>(null);
   const titleOverlayRef = useRef<HTMLDivElement>(null);
   const dateTriggerRef = useRef<HTMLDivElement>(null);
@@ -148,6 +146,7 @@ const QuickTaskModal: React.FC<QuickTaskModalProps> = ({
 
     const newTask: Task = {
       id: Math.random().toString(36).substr(2, 9),
+      type: 'task',
       title: parsed ? parsed.cleanTitle : titleValue,
       description: descHtml,
       isCompleted: false,
@@ -217,6 +216,26 @@ const QuickTaskModal: React.FC<QuickTaskModalProps> = ({
       return `${dateStr} ${timeStr}`;
     }
     return dateStr;
+  };
+
+  // --- Title Link Apply (wraps selected text in anchor) ---
+  const handleTitleFormatApply = (format: 'bold' | 'italic' | 'strikethrough' | 'code' | 'link', value?: string) => {
+    if (format !== 'link' || !value) return;
+
+    const input = titleInputRef.current;
+    if (!input) return;
+
+    const start = input.selectionStart;
+    const end = input.selectionEnd;
+
+    if (start === end) return; // No selection
+
+    const selectedText = titleValue.substring(start, end);
+    const beforeText = titleValue.substring(0, start);
+    const afterText = titleValue.substring(end);
+
+    const linkedText = `[${selectedText}](${value})`;
+    setTitleValue(beforeText + linkedText + afterText);
   };
 
   // --- Render ---

@@ -10,8 +10,11 @@ interface PeopleViewProps {
    onAddPerson: (person: Person) => void;
    onUpdatePerson: (person: Person) => void;
    onDeletePerson: (id: string) => void;
+   onUpdateActivity: (activity: Activity) => void;
+   onDeleteActivity: (id: string) => void;
    initialViewId?: string;
    onViewFavoriteChange?: () => void;
+   initialRecordId?: string;
 }
 
 const PeopleView: React.FC<PeopleViewProps> = ({
@@ -21,8 +24,11 @@ const PeopleView: React.FC<PeopleViewProps> = ({
    onAddPerson,
    onUpdatePerson,
    onDeletePerson,
+   onUpdateActivity,
+   onDeleteActivity,
    initialViewId,
-   onViewFavoriteChange
+   onViewFavoriteChange,
+   initialRecordId
 }) => {
    return (
       <GenericObjectView
@@ -35,6 +41,7 @@ const PeopleView: React.FC<PeopleViewProps> = ({
          onUpdateRecord={onUpdatePerson}
          onDeleteRecord={onDeletePerson}
          initialViewId={initialViewId}
+         initialRecordId={initialRecordId}
          onViewFavoriteChange={onViewFavoriteChange}
          DetailPanelRequest={({ isOpen, onClose, data, onUpdate, columns, people, onEditAttribute, onAddProperty, onToggleVisibility }) => (
             <PersonDetailPanel
@@ -49,6 +56,8 @@ const PeopleView: React.FC<PeopleViewProps> = ({
                onEditAttribute={onEditAttribute}
                onAddProperty={onAddProperty}
                onToggleVisibility={onToggleVisibility}
+               onUpdateActivity={onUpdateActivity}
+               onDeleteActivity={onDeleteActivity}
             />
          )}
       />

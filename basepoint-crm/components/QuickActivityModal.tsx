@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Company, Person, Activity, ActivityType, ACTIVITY_TYPE_CONFIGS, ParsedTask } from '../types';
+import { Company, Activity, ActivityType, ACTIVITY_TYPE_CONFIGS } from '../types';
+import { ParsedTask } from '../utils/taskParser';
 import { parseTaskInput } from '../utils/taskParser';
 import DatePickerPopover from './DatePickerPopover';
 import SearchableSelect from './SearchableSelect';
@@ -11,7 +12,6 @@ import {
   Calendar,
   X,
   CheckSquare,
-  Mail,
   Phone,
   Calendar as CalendarIcon
 } from 'lucide-react';
@@ -21,9 +21,7 @@ interface QuickActivityModalProps {
   onClose: () => void;
   onAddActivity: (activity: Activity) => void;
   companies: Company[];
-  people: Person[];
   preselectedCompanyId?: string;
-  preselectedPersonId?: string;
 }
 
 const QuickActivityModal: React.FC<QuickActivityModalProps> = ({
@@ -31,9 +29,7 @@ const QuickActivityModal: React.FC<QuickActivityModalProps> = ({
   onClose,
   onAddActivity,
   companies,
-  people,
-  preselectedCompanyId,
-  preselectedPersonId
+  preselectedCompanyId
 }) => {
   // --- State ---
   const [selectedType, setSelectedType] = useState<ActivityType>('task');
@@ -47,7 +43,7 @@ const QuickActivityModal: React.FC<QuickActivityModalProps> = ({
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
   const [manualDate, setManualDate] = useState<Date | null>(null);
   const [manualCompanyId, setManualCompanyId] = useState<string | null>(null);
-  const [manualPersonId, setManualPersonId] = useState<string | null>(null);
+
 
   // @ Mentions in Title
   const [showMentionPicker, setShowMentionPicker] = useState(false);
@@ -70,7 +66,6 @@ const QuickActivityModal: React.FC<QuickActivityModalProps> = ({
       setParsed(null);
       setManualDate(null);
       setManualCompanyId(preselectedCompanyId || null);
-      setManualPersonId(preselectedPersonId || null);
       setIsDatePickerOpen(false);
       setShowMentionPicker(false);
       setMentionFilter('');
@@ -80,7 +75,7 @@ const QuickActivityModal: React.FC<QuickActivityModalProps> = ({
       }
       setTimeout(() => titleInputRef.current?.focus(), 50);
     }
-  }, [isOpen, preselectedCompanyId, preselectedPersonId]);
+  }, [isOpen, preselectedCompanyId]);
 
   // --- Escape Handling ---
   useEffect(() => {
@@ -110,11 +105,25 @@ const QuickActivityModal: React.FC<QuickActivityModalProps> = ({
   // --- Derived Values ---
   const effectiveDate = manualDate || parsed?.dueDate;
   const effectiveCompanyId = manualCompanyId || parsed?.linkedCompany?.id;
-  const effectivePersonId = manualPersonId;
 
-  // --- @ Trigger Detection ---
+
+  // --- @ Trigger Detection & Slash Commands ---
   const handleTitleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const val = e.target.value;
+    let val = e.target.value;
+    const lowerVal = val.toLowerCase();
+
+    // Slash command detection (only at the start)
+    if (lowerVal.startsWith('/m ') || lowerVal === '/m' || lowerVal.startsWith('/meeting ') || lowerVal === '/meeting') {
+      setSelectedType('meeting');
+      val = val.replace(/^\/(m|meeting)\s?/, '');
+    } else if (lowerVal.startsWith('/c ') || lowerVal === '/c' || lowerVal.startsWith('/call ') || lowerVal === '/call') {
+      setSelectedType('call');
+      val = val.replace(/^\/(c|call)\s?/, '');
+    } else if (lowerVal.startsWith('/t ') || lowerVal === '/t' || lowerVal.startsWith('/task ') || lowerVal === '/task') {
+      setSelectedType('task');
+      val = val.replace(/^\/(t|task)\s?/, '');
+    }
+
     setTitleValue(val);
 
     const cursorPos = e.target.selectionStart;
@@ -247,7 +256,6 @@ const QuickActivityModal: React.FC<QuickActivityModalProps> = ({
       isCompleted: false,
       dueDate: effectiveDate || null,
       linkedCompanyId: effectiveCompanyId || undefined,
-      linkedPersonId: effectivePersonId || undefined,
       assignedTo: 'you',
       createdBy: 'you',
       createdAt: new Date()
@@ -317,7 +325,6 @@ const QuickActivityModal: React.FC<QuickActivityModalProps> = ({
   // --- Icon Mapper ---
   const iconMap = {
     CheckSquare,
-    Mail,
     Phone,
     Calendar: CalendarIcon
   };
@@ -342,7 +349,7 @@ const QuickActivityModal: React.FC<QuickActivityModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-[100] bg-black/40 backdrop-blur-sm flex items-start justify-center pt-[15vh]">
-      <div className="w-full max-w-2xl bg-white rounded-2xl shadow-2xl border border-gray-200 overflow-visible animate-in fade-in zoom-in-95 duration-200 relative flex flex-col">
+      <div className="w-full max-w-3xl bg-white rounded-2xl shadow-2xl border border-gray-200 overflow-visible animate-in fade-in zoom-in-95 duration-200 relative flex flex-col">
 
         <button
           onClick={onClose}
@@ -492,15 +499,6 @@ const QuickActivityModal: React.FC<QuickActivityModalProps> = ({
               />
             </div>
 
-            <div className="w-[140px] flex-shrink-0">
-              <SearchableSelect
-                value={effectivePersonId}
-                onChange={setManualPersonId}
-                options={people.map(p => ({ id: p.id, label: p.name }))}
-                placeholder="Linked to person..."
-                className="border border-gray-200 rounded-lg h-[34px] text-xs bg-white hover:bg-gray-50 shadow-sm"
-              />
-            </div>
 
           </div>
 
@@ -514,7 +512,10 @@ const QuickActivityModal: React.FC<QuickActivityModalProps> = ({
             <button
               onClick={handleSubmit}
               disabled={!titleValue.trim()}
-              className="px-6 py-2.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-md shadow-blue-500/10 transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap active:scale-[0.98]"
+              className={`px-6 py-2.5 text-sm font-medium text-white rounded-xl shadow-md transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap active:scale-[0.98] ${selectedType === 'task' ? 'bg-blue-600 hover:bg-blue-700 shadow-blue-500/10' :
+                selectedType === 'call' ? 'bg-green-600 hover:bg-green-700 shadow-green-500/10' :
+                  'bg-purple-600 hover:bg-purple-700 shadow-purple-500/10'
+                }`}
             >
               Add {selectedType}
             </button>

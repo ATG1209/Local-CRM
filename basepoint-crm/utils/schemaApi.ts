@@ -5,6 +5,8 @@ const API_BASE = 'http://localhost:3001/api';
 export interface ObjectType {
     id: string;
     name: string;
+    singularName?: string;
+    description?: string;
     slug: string;
     icon: string;
     isSystem: boolean;

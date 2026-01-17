@@ -6,7 +6,7 @@ const ReportsView = React.lazy(() => import('./components/ReportsView'));
 const WorkflowsView = React.lazy(() => import('./components/WorkflowsView'));
 import ActivitiesView from './components/ActivitiesView';
 import PeopleView from './components/PeopleView';
-import PlaceholderView from './components/PlaceholderView';
+const PlaceholderView = React.lazy(() => import('./components/PlaceholderView'));
 import GenericObjectView from './components/GenericObjectView';
 import TopBar from './components/TopBar';
 import CommandPalette from './components/CommandPalette';
@@ -35,6 +35,7 @@ const App: React.FC = () => {
   // Favorites State
   const [favoriteViews, setFavoriteViews] = useState<SavedView[]>([]);
   const [selectedViewId, setSelectedViewId] = useState<string | undefined>(undefined);
+  const [selectedRecordId, setSelectedRecordId] = useState<string | undefined>(undefined);
 
   const normalizeActivityDates = (activity: Activity): Activity => ({
     ...activity,
@@ -50,7 +51,6 @@ const App: React.FC = () => {
 
   useEffect(() => {
     const fetchData = async () => {
-      console.log("App: Fetching initial data...");
       try {
         const [fetchedCompanies, fetchedActivities, fetchedPeople] = await Promise.all([
           api.get('/companies'),
@@ -58,19 +58,9 @@ const App: React.FC = () => {
           api.get('/people')
         ]);
 
-        console.log("App: Raw data received", { fetchedCompanies, fetchedActivities, fetchedPeople });
-
-        if (Array.isArray(fetchedCompanies)) {
-          setCompanies(fetchedCompanies);
-        } else {
-          console.warn("App: fetchedCompanies is not an array", fetchedCompanies);
-          setCompanies([]);
-        }
+        setCompanies(Array.isArray(fetchedCompanies) ? fetchedCompanies : []);
 
         const activitiesArray = Array.isArray(fetchedActivities) ? fetchedActivities : [];
-        if (!Array.isArray(fetchedActivities)) {
-          console.warn("App: fetchedActivities is not an array", fetchedActivities);
-        }
 
         try {
           const parsedActivities = activitiesArray.map((a: any) => normalizeActivityDates(a));
@@ -80,12 +70,7 @@ const App: React.FC = () => {
           setActivities([]);
         }
 
-        if (Array.isArray(fetchedPeople)) {
-          setPeople(fetchedPeople);
-        } else {
-          console.warn("App: fetchedPeople is not an array", fetchedPeople);
-          setPeople([]);
-        }
+        setPeople(Array.isArray(fetchedPeople) ? fetchedPeople : []);
 
       } catch (err) {
         console.error("App: Failed to load data from API:", err);
@@ -134,6 +119,7 @@ const App: React.FC = () => {
   // Reset selectedViewId when activeView changes manually (not via favorite click)
   const handleViewChange = useCallback((view: ViewState) => {
     setSelectedViewId(undefined);
+    setSelectedRecordId(undefined);
     setActiveView(view);
   }, []);
 
@@ -205,34 +191,6 @@ const App: React.FC = () => {
     } catch (err) { console.error(err); }
   };
 
-  // --- Log Touch Action ---
-  const handleLogTouch = async (companyId: string) => {
-    const company = companies.find(c => c.id === companyId);
-    if (!company) return;
-
-    const now = new Date().toISOString();
-    const updatedCompany = { ...company, lastLoggedAt: now };
-
-    // 1. Update Company
-    handleUpdateCompany(updatedCompany);
-
-    // 2. Create Audit Activity
-    const newActivity: Activity = {
-      id: Math.random().toString(36).substr(2, 9),
-      type: 'call',
-      title: 'Logged touch',
-      description: 'Manual touch log',
-      isCompleted: true, // Auto-completed
-      dueDate: new Date(now), // "Occurred" today
-      createdAt: new Date(now),
-      linkedCompanyId: companyId,
-      createdBy: 'You',
-      assignedTo: 'You'
-    };
-
-    handleAddActivity(newActivity);
-  };
-
   // --- Keyboard Shortcuts ---
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -289,7 +247,12 @@ const App: React.FC = () => {
               onAddCompany={handleAddCompany}
               onUpdateCompany={handleUpdateCompany}
               onDeleteCompany={handleDeleteCompany}
+              onUpdateActivity={handleUpdateActivity}
+              onDeleteActivity={handleDeleteActivity}
+              onUpdatePerson={handleUpdatePerson}
+              onDeletePerson={handleDeletePerson}
               initialViewId={selectedViewId}
+              initialRecordId={selectedRecordId}
               onViewFavoriteChange={loadFavorites}
             />
           </ErrorBoundary>
@@ -325,6 +288,7 @@ const App: React.FC = () => {
               onOpenQuickActivity={() => setIsQuickActivityModalOpen(true)}
               newActivityTrigger={newActivityTrigger}
               initialViewId={selectedViewId}
+              initialRecordId={selectedRecordId}
               onViewFavoriteChange={loadFavorites}
             />
           </ErrorBoundary>
@@ -339,7 +303,10 @@ const App: React.FC = () => {
               onAddPerson={handleAddPerson}
               onUpdatePerson={handleUpdatePerson}
               onDeletePerson={handleDeletePerson}
+              onUpdateActivity={handleUpdateActivity}
+              onDeleteActivity={handleDeleteActivity}
               initialViewId={selectedViewId}
+              initialRecordId={selectedRecordId}
               onViewFavoriteChange={loadFavorites}
             />
           </ErrorBoundary>
@@ -364,7 +331,12 @@ const App: React.FC = () => {
               onAddCompany={handleAddCompany}
               onUpdateCompany={handleUpdateCompany}
               onDeleteCompany={handleDeleteCompany}
+              onUpdateActivity={handleUpdateActivity}
+              onDeleteActivity={handleDeleteActivity}
+              onUpdatePerson={handleUpdatePerson}
+              onDeletePerson={handleDeletePerson}
               initialViewId={selectedViewId}
+              initialRecordId={selectedRecordId}
               onViewFavoriteChange={loadFavorites}
             />
           </ErrorBoundary>
@@ -401,7 +373,11 @@ const App: React.FC = () => {
         <CommandPalette
           isOpen={isCommandPaletteOpen}
           onClose={() => setIsCommandPaletteOpen(false)}
-          onNavigate={(view) => { setActiveView(view); setIsCommandPaletteOpen(false); }}
+          onNavigate={(view, recordId) => {
+            setSelectedRecordId(recordId);
+            setActiveView(view);
+            setIsCommandPaletteOpen(false);
+          }}
           companies={companies}
           activities={activities}
           people={people}
@@ -414,7 +390,6 @@ const App: React.FC = () => {
           onClose={() => setIsQuickActivityModalOpen(false)}
           onAddActivity={handleAddActivity}
           companies={companies}
-          people={people}
         />
       </ErrorBoundary>
     </div>

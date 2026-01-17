@@ -1,9 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Company, Person, Activity, ColumnDefinition, ColumnType } from '../types';
+import { ACTIVITY_COLUMNS, ViewState, Company, Activity, Person, SavedView, ColumnDefinition, ColumnType } from '../types';
 import SearchableSelect from './SearchableSelect';
 import RelationPicker from './RelationPicker';
 import CompanyAvatar from './CompanyAvatar';
 import ActivityTimeline from './ActivityTimeline';
+import TaskDetailPanel from './TaskDetailPanel';
+import DatePickerPopover from './DatePickerPopover';
+import { formatDistanceToNow, differenceInCalendarDays } from 'date-fns';
 import {
     X,
     Globe,
@@ -32,57 +35,17 @@ import {
     Layout,
     List,
     Grid2X2,
-    CalendarX,
-    CalendarClock,
-    ListX,
-    AlertCircle,
-    CheckCircle,
-    Disc,
-    History
+    RefreshCcw
 } from 'lucide-react';
-import { CompanyAlert, AlertSegment, AlertSeverity } from '../utils/alertHelper';
 
-// --- Alert Components (Duplicated for now, ideally shared) ---
-const AlertIcon = ({ name, className }: { name: string, className?: string }) => {
-    const size = 14;
-    switch (name) {
-        case 'CalendarX': return <CalendarX size={size} className={className} />;
-        case 'Calendar': return <Calendar size={size} className={className} />;
-        case 'CalendarClock': return <CalendarClock size={size} className={className} />;
-        case 'ListX': return <ListX size={size} className={className} />;
-        case 'CheckSquare': return <CheckSquare size={size} className={className} />;
-        case 'AlertCircle': return <AlertCircle size={size} className={className} />;
-        case 'CheckCircle': return <CheckCircle size={size} className={className} />;
-        case 'Disc': return <Disc size={size} className={className} />;
-        case 'History': return <History size={size} className={className} />;
-        default: return <Calendar size={size} className={className} />;
-    }
-};
-
-const AlertPill = ({ segment }: { segment: AlertSegment }) => {
-    const severityColors: Record<AlertSeverity, string> = {
-        danger: "bg-red-100 text-red-700 border-red-200",
-        warning: "bg-amber-100 text-amber-700 border-amber-200",
-        info: "bg-blue-100 text-blue-700 border-blue-200",
-        success: "bg-green-100 text-green-700 border-green-200",
-        neutral: "bg-gray-100 text-gray-700 border-gray-200"
-    };
-
-    return (
-        <div
-            className={`flex items-center gap-1.5 px-2 py-0.5 rounded-full border text-[10px] font-medium whitespace-nowrap ${severityColors[segment.severity]}`}
-            title={segment.text}
-        >
-            <AlertIcon name={segment.icon} />
-            <span>{segment.text}</span>
-        </div>
-    );
-};
+import PersonDetailPanel from './PersonDetailPanel';
+import { fetchAttributes } from '../utils/schemaApi';
 
 interface CompanyDetailPanelProps {
     company: Company | null;
     isOpen: boolean;
     onClose: () => void;
+    companies: Company[];
     people: Person[];
     activities: Activity[];
     onUpdate: (company: Company) => void;
@@ -91,8 +54,10 @@ interface CompanyDetailPanelProps {
     onAddProperty: () => void;
     onToggleVisibility?: (colId: string) => void;
     onOpenActivityModal?: (companyId: string) => void;
-    onLogTouch?: (companyId: string) => void;
-    computedAlert?: CompanyAlert;
+    onUpdateActivity: (activity: Activity) => void;
+    onDeleteActivity: (id: string) => void;
+    onUpdatePerson: (person: Person) => void;
+    onDeletePerson: (id: string) => void;
 }
 
 const TypeIcon = ({ type }: { type: ColumnType }) => {
@@ -120,6 +85,7 @@ const CompanyDetailPanel: React.FC<CompanyDetailPanelProps> = ({
     company,
     isOpen,
     onClose,
+    companies,
     people,
     activities,
     onUpdate,
@@ -128,13 +94,20 @@ const CompanyDetailPanel: React.FC<CompanyDetailPanelProps> = ({
     onAddProperty,
     onToggleVisibility,
     onOpenActivityModal,
-    onLogTouch,
-    computedAlert
+    onUpdateActivity,
+    onDeleteActivity,
+    onUpdatePerson,
+    onDeletePerson
 }) => {
     const [showHiddenProps, setShowHiddenProps] = useState(false);
     const [editForm, setEditForm] = useState<Company | null>(null);
     const panelRef = useRef<HTMLDivElement>(null);
     const [editingHeader, setEditingHeader] = useState(false);
+    const [editingActivity, setEditingActivity] = useState<Activity | null>(null);
+    const [editingPerson, setEditingPerson] = useState<Person | null>(null);
+    const [personColumns, setPersonColumns] = useState<ColumnDefinition[]>([]);
+    const [logTouchPickerOpen, setLogTouchPickerOpen] = useState(false);
+    const logTouchTriggerRef = useRef<HTMLSpanElement>(null);
 
     useEffect(() => {
         if (company) {
@@ -142,6 +115,39 @@ const CompanyDetailPanel: React.FC<CompanyDetailPanelProps> = ({
             setEditingHeader(false);
         }
     }, [company]);
+
+    useEffect(() => {
+        const loadPersonAttributes = async () => {
+            try {
+                const attrs = await fetchAttributes('obj_people');
+                const { attributeToColumn } = await import('../utils/attributeHelpers');
+                setPersonColumns(attrs.map(attr => attributeToColumn(attr)));
+            } catch (err) {
+                console.error("Failed to load person attributes", err);
+            }
+        };
+        if (isOpen) {
+            loadPersonAttributes();
+        }
+    }, [isOpen]);
+
+    // Handle Escape key to close the panel (unless nested panel is handled first)
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Escape' && isOpen && !editingActivity && !editingPerson) {
+                onClose();
+            }
+        };
+
+        if (isOpen) {
+            // Priority listener, handle only if editingActivity is NOT open
+            window.addEventListener('keydown', handleKeyDown);
+        }
+
+        return () => {
+            window.removeEventListener('keydown', handleKeyDown);
+        };
+    }, [isOpen, onClose, editingActivity]);
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
@@ -184,17 +190,108 @@ const CompanyDetailPanel: React.FC<CompanyDetailPanelProps> = ({
         icon: <div className="w-4 h-4 rounded-full bg-gray-200 flex items-center justify-center text-[8px] font-bold text-gray-500">{p.name.substring(0, 1).toUpperCase()}</div>
     }));
 
-    const inputClass = "w-full text-sm px-2 py-1 border border-transparent hover:border-gray-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 bg-transparent rounded transition-all outline-none";
+    const inputClass = "w-full text-sm px-0 py-1 border border-transparent hover:border-gray-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 bg-transparent rounded transition-all outline-none";
 
     const renderFieldInput = (col: ColumnDefinition) => {
         const value = (editForm as any)[col.accessorKey];
 
         if (col.readonly) {
             return (
-                <div className="text-sm text-gray-500 py-1">
+                <div className="text-sm text-gray-500 py-1 transition-all">
                     {col.type === 'timestamp' || col.type === 'date'
                         ? (value ? new Date(value).toLocaleDateString() : '-')
-                        : (value || '-')}
+                        : (typeof value === 'object' && value !== null ? '-' : (value || '-'))}
+                </div>
+            );
+        }
+
+        // Special case: LogTouchControl for lastLoggedAt field
+        const isLogTouchField = col.accessorKey === 'lastLoggedAt' ||
+            col.id === 'lastLoggedAt' ||
+            (col.label && col.label.toLowerCase().includes('last logged'));
+
+        if (isLogTouchField) {
+            let loggedDate = value ? new Date(value) : null;
+            // Validate date
+            if (loggedDate && isNaN(loggedDate.getTime())) {
+                loggedDate = null;
+            }
+
+            // Logic: Incremental time with urgency colors
+            let statusText = 'Never logged';
+            let colorClass = 'text-gray-400 italic';
+
+            if (loggedDate) {
+                const daysSince = differenceInCalendarDays(new Date(), loggedDate);
+
+                if (daysSince === 0) {
+                    statusText = 'Today';
+                } else if (daysSince === 1) {
+                    statusText = 'Yesterday';
+                } else {
+                    statusText = `${daysSince} days ago`;
+                }
+
+                if (daysSince >= 14) {
+                    colorClass = 'text-red-600 font-medium';
+                } else if (daysSince >= 10) {
+                    colorClass = 'text-yellow-600 font-medium';
+                } else {
+                    colorClass = 'text-gray-900';
+                }
+            }
+
+            return (
+                <div className="flex items-center gap-2 min-h-[32px] relative group">
+                    {/* Quick Log Button - Always visible */}
+                    <button
+                        type="button"
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            handleUpdateField(col.accessorKey, Date.now());
+                        }}
+                        className="p-1.5 rounded-md text-blue-600 bg-blue-50 hover:bg-blue-100 transition-colors"
+                        title="Log touch now"
+                    >
+                        <RefreshCcw size={14} />
+                    </button>
+
+                    <div
+                        className={`flex-1 flex items-center gap-2 cursor-pointer p-1 rounded hover:bg-gray-50 ${logTouchPickerOpen ? 'bg-gray-50' : ''}`}
+                        onClick={() => setLogTouchPickerOpen(true)}
+                        ref={logTouchTriggerRef}
+                    >
+                        <span className={`text-sm ${colorClass}`}>
+                            {statusText}
+                        </span>
+                    </div>
+
+                    <button
+                        type="button"
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            setLogTouchPickerOpen(true);
+                        }}
+                        className="p-1 rounded text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors opacity-0 group-hover:opacity-100"
+                        title="Pick a date"
+                    >
+                        <Calendar size={14} />
+                    </button>
+
+                    <DatePickerPopover
+                        date={loggedDate}
+                        onChange={(newDate) => {
+                            if (newDate) {
+                                handleUpdateField(col.accessorKey, newDate.getTime());
+                            } else {
+                                handleUpdateField(col.accessorKey, null);
+                            }
+                        }}
+                        onClose={() => setLogTouchPickerOpen(false)}
+                        isOpen={logTouchPickerOpen}
+                        triggerRef={logTouchTriggerRef as React.RefObject<HTMLElement>}
+                        align="left"
+                    />
                 </div>
             );
         }
@@ -202,33 +299,30 @@ const CompanyDetailPanel: React.FC<CompanyDetailPanelProps> = ({
         switch (col.type) {
             case 'relation': // Multi-select for POC and other relations
                 return (
-                    <div className="min-h-[32px]">
-                        <RelationPicker
-                            value={value}
-                            onChange={(newIds) => handleUpdateField(col.accessorKey, newIds)}
-                            options={personOptions}
-                            type="person"
-                            placeholder="Select..."
-                            emptyMessage="Select as many as you like"
-                        />
-                    </div>
+                    <RelationPicker
+                        value={value}
+                        onChange={(newIds) => handleUpdateField(col.accessorKey, newIds)}
+                        onItemClick={col.accessorKey === 'attr_comp_poc' || col.accessorKey === 'pointOfContactId' ? (id) => setEditingPerson(people.find(p => p.id === id) || null) : undefined}
+                        options={personOptions}
+                        type="person"
+                        placeholder="Select..."
+                        emptyMessage="Select as many as you like"
+                    />
                 );
             case 'select':
             case 'multi-select':
                 if (col.options && col.options.length > 0) {
                     return (
-                        <div className="h-8">
-                            <SearchableSelect
-                                value={Array.isArray(value) ? value[0] : value}
-                                onChange={(val) => handleUpdateField(col.accessorKey, col.type === 'multi-select' ? [val] : val)}
-                                options={col.options.map(opt => ({
-                                    id: opt.id,
-                                    label: opt.label,
-                                    icon: <div className={`w-3 h-3 rounded-full ${opt.color.split(' ')[0]}`}></div>
-                                }))}
-                                className="border-transparent bg-transparent hover:bg-gray-50 -ml-2"
-                            />
-                        </div>
+                        <SearchableSelect
+                            value={Array.isArray(value) ? value[0] : value}
+                            onChange={(val) => handleUpdateField(col.accessorKey, col.type === 'multi-select' ? [val] : val)}
+                            options={col.options.map(opt => ({
+                                id: opt.id,
+                                label: opt.label,
+                                icon: <div className={`w-3 h-3 rounded-full ${opt.color.split(' ')[0]}`}></div>
+                            }))}
+                            className="border-transparent bg-transparent hover:bg-gray-50"
+                        />
                     );
                 }
                 // Fallback to text for unconfigured selects
@@ -264,12 +358,12 @@ const CompanyDetailPanel: React.FC<CompanyDetailPanelProps> = ({
                         type="checkbox"
                         checked={!!value}
                         onChange={(e) => handleUpdateField(col.accessorKey, e.target.checked)}
-                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 w-4 h-4 cursor-pointer mt-1.5"
+                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 w-4 h-4 cursor-pointer"
                     />
                 );
             case 'rating':
                 return (
-                    <div className="flex items-center gap-1 py-1">
+                    <div className="flex items-center gap-1">
                         {[1, 2, 3, 4, 5].map((star) => (
                             <Star
                                 key={star}
@@ -284,7 +378,7 @@ const CompanyDetailPanel: React.FC<CompanyDetailPanelProps> = ({
                 if (col.id === 'notes') { // Special case for notes
                     return (
                         <textarea
-                            className={`${inputClass} min-h-[80px] resize-none`}
+                            className={`${inputClass} min-h-[80px] py-2 resize-none`}
                             value={value || ''}
                             onChange={(e) => handleUpdateField(col.accessorKey, e.target.value)}
                             placeholder="Add notes..."
@@ -303,12 +397,25 @@ const CompanyDetailPanel: React.FC<CompanyDetailPanelProps> = ({
         }
     };
 
-    // Separate link columns from other columns
-    const linkColumns = columns.filter(c => c.type === 'link' && c.visible);
-    // Filter out columns we show in the header explicitly and link columns (shown in Quick Links)
-    const detailColumns = columns.filter(c => c.id !== 'name' && c.type !== 'link' && c.visible);
-    // Hidden columns (for visibility toggle section)
-    const hiddenColumns = columns.filter(c => c.id !== 'name' && c.type !== 'link' && !c.visible);
+    const detailColumns = columns.filter(col =>
+        !col.hidden &&
+        col.id !== 'name' &&
+        col.id !== 'domain' &&
+        col.type !== 'url'
+    );
+
+    const hiddenColumns = columns.filter(col =>
+        col.hidden &&
+        col.id !== 'name' &&
+        col.id !== 'domain'
+    );
+
+    const linkColumns = columns.filter(col =>
+        !col.hidden &&
+        (col.type === 'url' || col.id === 'domain')
+    );
+
+    if (!isOpen || !company || !editForm) return null;
 
     return (
         <>
@@ -318,7 +425,11 @@ const CompanyDetailPanel: React.FC<CompanyDetailPanelProps> = ({
                     onClick={onClose}
                 />
             )}
-            <div className={`fixed inset-y-0 right-0 w-[520px] bg-white shadow-2xl border-l border-gray-200 transform transition-transform duration-300 ease-in-out z-[60] flex flex-col ${isOpen ? 'translate-x-0' : 'translate-x-full'}`} ref={panelRef}>
+            <div
+                className={`fixed inset-y-0 right-0 w-[500px] bg-white shadow-2xl z-[60] transform transition-transform duration-300 flex flex-col ${isOpen ? 'translate-x-0' : 'translate-x-full'
+                    }`}
+                ref={panelRef}
+            >
                 {/* Compact Header */}
                 <div className="flex items-start justify-between px-5 py-4 border-b border-gray-100 bg-gray-50/30">
                     <div className="flex items-center gap-3 flex-1 min-w-0">
@@ -408,49 +519,25 @@ const CompanyDetailPanel: React.FC<CompanyDetailPanelProps> = ({
                         </div>
                     )}
 
-                    {/* Alert Section (New) */}
-                    {(computedAlert || onLogTouch) && (
-                        <div className="px-5 py-4 border-b border-gray-100 bg-gray-50/50 flex flex-col gap-3">
-                            <div className="flex items-center justify-between">
-                                <h3 className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Status</h3>
-                                {onLogTouch && (
-                                    <button
-                                        onClick={() => onLogTouch(company.id)}
-                                        className="flex items-center gap-1.5 px-2 py-1 bg-white border border-gray-200 hover:bg-gray-50 hover:border-gray-300 text-xs font-medium text-gray-700 rounded shadow-sm transition-all"
-                                    >
-                                        <History size={12} className="text-gray-400" />
-                                        Log touch
-                                    </button>
-                                )}
-                            </div>
-                            {computedAlert && (
-                                <div className="flex flex-wrap gap-2">
-                                    {computedAlert.segments.map((seg, i) => (
-                                        <AlertPill key={i} segment={seg} />
-                                    ))}
-                                </div>
-                            )}
-                        </div>
-                    )}
-
                     {/* Dynamic Properties Grid */}
                     <div className="px-5 py-6 border-b border-gray-100">
                         <h3 className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-4 pl-1">Properties</h3>
                         <div className="space-y-1">
                             {detailColumns.map(col => (
-                                <div key={col.id} className="group grid grid-cols-[140px_1fr_auto] items-start gap-2 py-1 min-h-[32px] hover:bg-gray-50 rounded px-1 -mx-1">
-                                    <div className="flex items-center gap-2 text-sm text-gray-500 mt-1.5 overflow-hidden">
+                                <div key={col.id} className="group grid grid-cols-[160px_1fr_auto] items-center gap-2 py-1 min-h-[32px] hover:bg-gray-50 rounded px-1 -mx-1">
+                                    <div className="flex items-center gap-2 text-sm text-gray-500 min-h-[32px] overflow-hidden">
                                         <div className="p-1 rounded bg-gray-100 text-gray-500 flex-shrink-0">
                                             <TypeIcon type={col.type} />
                                         </div>
                                         <span className="truncate" title={col.label}>{col.label}</span>
                                     </div>
+
                                     <div className="relative min-w-0">
                                         {renderFieldInput(col)}
                                     </div>
 
                                     {/* Action buttons - Settings & Hide */}
-                                    <div className="flex items-center gap-0.5 mt-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <div className="flex items-center gap-0.5 min-h-[32px] opacity-0 group-hover:opacity-100 transition-opacity">
                                         <div
                                             className="cursor-pointer p-1 text-gray-300 hover:text-gray-600 hover:bg-gray-100 rounded"
                                             onClick={(e) => { e.stopPropagation(); onEditAttribute(col); }}
@@ -492,12 +579,15 @@ const CompanyDetailPanel: React.FC<CompanyDetailPanelProps> = ({
                                     {showHiddenProps && (
                                         <div className="mt-2 space-y-1">
                                             {hiddenColumns.map(col => (
-                                                <div key={col.id} className="group flex items-center justify-between py-1.5 px-2 -mx-1 rounded hover:bg-gray-50">
-                                                    <div className="flex items-center gap-2 text-sm text-gray-400">
+                                                <div key={col.id} className="group grid grid-cols-[160px_1fr_auto] items-center gap-2 py-1 min-h-[32px] hover:bg-gray-50 rounded px-1 -mx-1 opacity-70 hover:opacity-100">
+                                                    <div className="flex items-center gap-2 text-sm text-gray-400 min-h-[32px]">
                                                         <div className="p-1 rounded bg-gray-100 text-gray-400 flex-shrink-0">
                                                             <TypeIcon type={col.type} />
                                                         </div>
                                                         <span className="truncate" title={col.label}>{col.label}</span>
+                                                    </div>
+                                                    <div className="relative min-w-0 pointer-events-none grayscale opacity-60">
+                                                        {renderFieldInput(col)}
                                                     </div>
                                                     {onToggleVisibility && (
                                                         <button
@@ -532,12 +622,44 @@ const CompanyDetailPanel: React.FC<CompanyDetailPanelProps> = ({
                         </div>
                         <ActivityTimeline
                             activities={activities.filter(a => a.linkedCompanyId === company?.id)}
-                            companies={[]}
+                            companies={companies}
                             people={people}
                             showPersonLinks={true}
+                            onOpenActivity={(a) => setEditingActivity(a)}
                         />
                     </div>
                 </div>
+
+                {/* Activity Detail Panel (Nested) */}
+                <TaskDetailPanel
+                    task={editingActivity}
+                    isOpen={!!editingActivity}
+                    onClose={() => setEditingActivity(null)}
+                    companies={companies}
+                    people={people}
+                    onUpdate={onUpdateActivity}
+                    onDelete={onDeleteActivity}
+                    columns={ACTIVITY_COLUMNS}
+                    onEditAttribute={() => { }}
+                    onAddProperty={() => { }}
+                />
+
+                {/* Person Detail Panel (Nested) */}
+                <PersonDetailPanel
+                    person={editingPerson}
+                    isOpen={!!editingPerson}
+                    onClose={() => setEditingPerson(null)}
+                    companies={companies}
+                    people={people}
+                    activities={activities}
+                    onUpdate={onUpdatePerson}
+                    onDeleteActivity={onDeleteActivity}
+                    onUpdateActivity={onUpdateActivity}
+                    onDeletePerson={onDeletePerson}
+                    columns={personColumns}
+                    onEditAttribute={() => { }}
+                    onAddProperty={() => { }}
+                />
             </div>
         </>
     );
